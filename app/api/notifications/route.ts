@@ -1,0 +1,3 @@
+import {NextResponse} from 'next/server';import {db} from '@/lib/db';import {guard} from '@/lib/api';
+export async function GET(){const g=await guard('*');if(g.error)return g.error;return NextResponse.json(await db.notification.findMany({where:{userId:g.user!.id},orderBy:{createdAt:'desc'},take:30}))}
+export async function PATCH(req:Request){const g=await guard('*');if(g.error)return g.error;const b=await req.json();if(b.all)await db.notification.updateMany({where:{userId:g.user!.id,read:false},data:{read:true}});else if(b.id)await db.notification.update({where:{id:b.id,userId:g.user!.id},data:{read:true}});return NextResponse.json({ok:true})}

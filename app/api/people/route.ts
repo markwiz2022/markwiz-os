@@ -1,0 +1,1 @@
+import {NextResponse} from 'next/server';import {db} from '@/lib/db';import {requireUser} from '@/lib/auth';export async function GET(){await requireUser('people');return NextResponse.json(await db.user.findMany({select:{id:true,name:true,email:true,role:true,status:true,leaveQuota:true,leavesTaken:true,shiftSeconds:true}}))}

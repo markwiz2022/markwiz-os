@@ -1,0 +1,680 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                      String                  @id @default(cuid())
+  name                    String
+  email                   String                  @unique
+  passwordHash            String
+  role                    Role                    @default(MEMBER)
+  active                  Boolean                 @default(true)
+  leaveQuota              Float                   @default(5.25)
+  leavesTaken             Float                   @default(0)
+  checkInAt               DateTime?
+  checkOutAt              DateTime?
+  shiftSeconds            Int                     @default(0)
+  status                  String                  @default("Offline")
+  createdAt               DateTime                @default(now())
+  updatedAt               DateTime                @updatedAt
+  attendanceLogs          AttendanceLog[]
+  auditLogs               AuditLog[]
+  salesLeads              Lead[]                  @relation("LeadOwner")
+  leadActivities          LeadActivity[]
+  leaveRequests           LeaveRequest[]
+  notifications           Notification[]
+  resolvedRegularisations RegularisationRequest[] @relation("RegularisationResolver")
+  regularisationRequests  RegularisationRequest[] @relation("RegularisationRequester")
+  assignedTasks           Task[]                  @relation("TaskAssigner")
+  tasks                   Task[]                  @relation("TaskOwner")
+  timeEntries             TimeEntry[]
+  monthlySalary           Float                   @default(0)
+  employeeCode            String?                 @unique
+  joiningDate             DateTime?
+  payrollItems            PayrollItem[]
+  payrollAdjustments      PayrollAdjustment[]     @relation("AdjustmentCreator")
+  payrollRuns             PayrollRun[]             @relation("PayrollPayer")
+  expenseRequests         ExpenseRequest[]
+  reviewedExpenseRequests ExpenseRequest[]         @relation("ExpenseReviewer")
+  // Autopilot (Sep 2026)
+  seat                    String?
+  kpiTargets              KpiTarget[]
+  manualKpiValues         ManualKpiValue[]
+  scorecards              ScorecardMonth[]
+  performanceFlags        PerformanceFlag[]
+  dailyPlans              DailyPlan[]
+  outreachLogs            OutreachLog[]
+  checkpoints             OnboardingCheckpoint[]
+}
+
+model Client {
+  id             String       @id @default(cuid())
+  name           String
+  company        String?
+  industry       String?
+  email          String?
+  phone          String?
+  website        String?
+  retainer       Float        @default(0)
+  startDate      DateTime?
+  renewalDate    DateTime?
+  accountManager String?
+  healthScore    Int          @default(80)
+  health         ClientHealth @default(GREEN)
+  notes          String?
+  active         Boolean      @default(true)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  expenses       Expense[]
+  invoices       Invoice[]
+  meetings       Meeting[]
+  projects       Project[]
+  tasks          Task[]
+  internal       Boolean      @default(false)
+  scopeItems     ScopeItem[]
+  incidents      Incident[]
+}
+
+model Project {
+  id        String    @id @default(cuid())
+  name      String
+  clientId  String
+  status    String    @default("Active")
+  startDate DateTime?
+  endDate   DateTime?
+  createdAt DateTime  @default(now())
+  client    Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  tasks     Task[]
+}
+
+model Task {
+  id            String      @id @default(cuid())
+  clientId      String
+  projectId     String?
+  desc          String
+  ownerId       String
+  assignerId    String
+  due           DateTime
+  priority      Priority    @default(P2)
+  approvalLevel String      @default("L0")
+  status        TaskStatus  @default(OPEN)
+  blockedById   String?
+  timeSeconds   Int         @default(0)
+  runningSince  DateTime?
+  checklist     Json?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  comments      Comment[]
+  assigner      User        @relation("TaskAssigner", fields: [assignerId], references: [id])
+  owner         User        @relation("TaskOwner", fields: [ownerId], references: [id])
+  project       Project?    @relation(fields: [projectId], references: [id])
+  client        Client      @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  timeEntries   TimeEntry[]
+  // Autopilot (Sep 2026): gated flow, delivery timestamps, scope link
+  category          String     @default("GENERAL")
+  clientFacing      Boolean    @default(true)
+  needsCopy         Boolean    @default(false)
+  needsProof        Boolean    @default(false)
+  approvedCopy      String?
+  copyById          String?
+  copyAt            DateTime?
+  deliverableUrl    String?
+  proofById         String?
+  proofAt           DateTime?
+  reviewedById      String?
+  reviewedAt        DateTime?
+  firstSubmittedAt  DateTime?
+  deliveredAt       DateTime?
+  lastSentAt        DateTime?
+  completedAt       DateTime?
+  internalReturns   Int        @default(0)
+  clientReturns     Int        @default(0)
+  overdueNotifiedAt DateTime?
+  escalatedAt       DateTime?
+  scopeItemId       String?
+  periodKey         String?
+  scopeItem         ScopeItem? @relation(fields: [scopeItemId], references: [id], onDelete: SetNull)
+  events            TaskEvent[]
+  files             TaskFile[]
+  proofChecks       ProofCheck[]
+  incidents         Incident[]
+
+  @@unique([scopeItemId, periodKey])
+  @@index([ownerId, status])
+  @@index([status, due])
+}
+
+model TimeEntry {
+  id        String    @id @default(cuid())
+  userId    String
+  taskId    String?
+  seconds   Int
+  startedAt DateTime
+  endedAt   DateTime?
+  task      Task?     @relation(fields: [taskId], references: [id])
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Comment {
+  id        String   @id @default(cuid())
+  taskId    String
+  authorId  String
+  body      String
+  createdAt DateTime @default(now())
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+}
+
+model Lead {
+  id           String         @id @default(cuid())
+  name         String
+  company      String?
+  email        String?
+  phone        String?
+  website      String?
+  industry     String?
+  source       String?
+  value        Float          @default(0)
+  probability  Int            @default(20)
+  stage        LeadStage      @default(NEW)
+  ownerId      String?
+  nextAction   String?
+  nextFollowUp DateTime?
+  lastContact  DateTime?
+  notes        String?
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  owner        User?          @relation("LeadOwner", fields: [ownerId], references: [id])
+  activities   LeadActivity[]
+}
+
+model LeadActivity {
+  id        String   @id @default(cuid())
+  leadId    String
+  userId    String
+  type      String
+  note      String?
+  toStage   String?
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lead      Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+}
+
+model Invoice {
+  id        String        @id @default(cuid())
+  clientId  String
+  number    String        @unique
+  amount    Float
+  paid      Float         @default(0)
+  dueDate   DateTime
+  status    InvoiceStatus @default(DRAFT)
+  note      String?
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+  client    Client        @relation(fields: [clientId], references: [id], onDelete: Cascade)
+}
+
+model Expense {
+  id       String   @id @default(cuid())
+  clientId String?
+  category String
+  amount   Float
+  date     DateTime @default(now())
+  note     String?
+  client   Client?  @relation(fields: [clientId], references: [id])
+}
+
+model LeaveRequest {
+  id         String      @id @default(cuid())
+  userId     String
+  days       Float
+  startDate  DateTime?
+  endDate    DateTime?
+  reason     String
+  status     LeaveStatus @default(PENDING)
+  createdAt  DateTime    @default(now())
+  resolvedAt DateTime?
+  user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model AttendanceLog {
+  id     String         @id @default(cuid())
+  userId String
+  type   AttendanceType
+  at     DateTime       @default(now())
+  note   String?
+  user   User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model RegularisationRequest {
+  id               String               @id @default(cuid())
+  userId           String
+  attendanceAt     DateTime
+  note             String
+  status           RegularisationStatus @default(PENDING)
+  deductionApplied Boolean              @default(false)
+  resolvedAt       DateTime?
+  resolverId       String?
+  createdAt        DateTime             @default(now())
+  resolver         User?                @relation("RegularisationResolver", fields: [resolverId], references: [id])
+  user             User                 @relation("RegularisationRequester", fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Meeting {
+  id       String   @id @default(cuid())
+  clientId String
+  title    String
+  date     DateTime
+  notes    String?
+  client   Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  title     String
+  body      String
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+
+model PayrollRun {
+  id             String       @id @default(cuid())
+  monthKey       String       @unique
+  monthStart     DateTime
+  monthEnd       DateTime
+  workingDays    Int
+  status         PayrollStatus @default(DRAFT)
+  paidAt         DateTime?
+  paidById       String?
+  totalGross     Float        @default(0)
+  totalDeductions Float       @default(0)
+  totalNet       Float        @default(0)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  paidBy         User?        @relation("PayrollPayer", fields: [paidById], references: [id])
+  items          PayrollItem[]
+}
+
+model PayrollItem {
+  id                    String      @id @default(cuid())
+  payrollRunId          String
+  userId                String
+  monthlySalary         Float
+  workingDays           Int
+  attendanceDays        Float
+  paidLeaveDays         Float
+  unpaidDays            Float
+  latePunches           Int
+  regularisationsUsed   Int
+  pendingRegularisations Int
+  lateDeduction         Float
+  attendanceDeduction   Float
+  otherDeduction        Float       @default(0)
+  grossSalary           Float
+  netSalary             Float
+  createdAt             DateTime    @default(now())
+  updatedAt             DateTime    @updatedAt
+  payrollRun            PayrollRun  @relation(fields: [payrollRunId], references: [id], onDelete: Cascade)
+  user                  User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  adjustments           PayrollAdjustment[]
+  @@unique([payrollRunId, userId])
+}
+
+model PayrollAdjustment {
+  id          String      @id @default(cuid())
+  payrollItemId String
+  createdById String
+  amount      Float
+  reason      String
+  createdAt   DateTime    @default(now())
+  payrollItem PayrollItem @relation(fields: [payrollItemId], references: [id], onDelete: Cascade)
+  createdBy   User        @relation("AdjustmentCreator", fields: [createdById], references: [id])
+}
+
+model ExpenseRequest {
+  id          String               @id @default(cuid())
+  userId      String
+  title       String
+  category    String
+  amount      Float
+  frequency   String               @default("MONTHLY")
+  renewalDate DateTime?
+  reason      String
+  status      ExpenseRequestStatus @default(PENDING)
+  reviewedById String?
+  reviewedAt  DateTime?
+  reviewerNote String?
+  createdAt   DateTime             @default(now())
+  user        User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reviewedBy User?                @relation("ExpenseReviewer", fields: [reviewedById], references: [id])
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  action    String
+  entity    String
+  entityId  String?
+  metadata  Json?
+  createdAt DateTime @default(now())
+  user      User?    @relation(fields: [userId], references: [id])
+}
+
+enum PayrollStatus {
+  DRAFT
+  PAID
+}
+
+enum ExpenseRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum Role {
+  MD
+  DMM
+  SALES
+  DESIGNER
+  DEVELOPER
+  SEO
+  PERFORMANCE
+  HR
+  FINANCE
+  MEMBER
+}
+
+enum TaskStatus {
+  OPEN
+  IN_PROGRESS
+  REVIEW
+  APPROVAL
+  BLOCKED
+  CLIENT
+  DONE
+}
+
+enum Priority {
+  P1
+  P2
+  P3
+}
+
+enum LeadStage {
+  NEW
+  QUALIFIED
+  MEETING
+  PROPOSAL
+  NEGOTIATION
+  WON
+  LOST
+}
+
+enum InvoiceStatus {
+  DRAFT
+  SENT
+  PARTIAL
+  PAID
+  OVERDUE
+}
+
+enum LeaveStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum ClientHealth {
+  GREEN
+  AMBER
+  RED
+}
+
+enum AttendanceType {
+  CLOCK_IN
+  CLOCK_OUT
+}
+
+enum RegularisationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+
+// ---------------------------------------------------------------------------
+// AUTOPILOT (Sep 2026): scopes, gates, Say/Do, KPIs, onboarding, scheduler
+// ---------------------------------------------------------------------------
+
+model TaskEvent {
+  id        String   @id @default(cuid())
+  taskId    String
+  userId    String?
+  type      String
+  note      String?
+  createdAt DateTime @default(now())
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@index([taskId, createdAt])
+  @@index([type, createdAt])
+}
+
+model TaskFile {
+  id           String       @id @default(cuid())
+  taskId       String
+  uploadedById String
+  name         String
+  mime         String
+  size         Int
+  data         Bytes
+  createdAt    DateTime     @default(now())
+  task         Task         @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  checks       ProofCheck[]
+
+  @@index([taskId, createdAt])
+}
+
+model ProofCheck {
+  id               String    @id @default(cuid())
+  taskId           String
+  fileId           String?
+  status           String
+  model            String?
+  extracted        String?
+  issues           Json?
+  error            String?
+  acknowledgedById String?
+  acknowledgedAt   DateTime?
+  createdAt        DateTime  @default(now())
+  task             Task      @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  file             TaskFile? @relation(fields: [fileId], references: [id], onDelete: SetNull)
+
+  @@index([taskId, createdAt])
+}
+
+model ScopeItem {
+  id            String   @id @default(cuid())
+  clientId      String
+  title         String
+  category      String   @default("GENERAL")
+  cadence       String   @default("MONTHLY")
+  dueDay        Int      @default(5)
+  ownerId       String?
+  priority      Priority @default(P2)
+  approvalLevel String   @default("L1")
+  needsCopy     Boolean  @default(false)
+  needsProof    Boolean  @default(true)
+  notes         String?
+  active        Boolean  @default(true)
+  createdById   String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  client        Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  tasks         Task[]
+}
+
+model DailyPlan {
+  id          String          @id @default(cuid())
+  userId      String
+  dateKey     String
+  committedAt DateTime        @default(now())
+  late        Boolean         @default(false)
+  noPlan      Boolean         @default(false)
+  closedAt    DateTime?
+  items       DailyPlanItem[]
+  user        User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, dateKey])
+  @@index([dateKey])
+}
+
+model DailyPlanItem {
+  id       String    @id @default(cuid())
+  planId   String
+  taskId   String?
+  title    String
+  outcome  String    @default("PENDING")
+  reason   String?
+  reasonAt DateTime?
+  plan     DailyPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+}
+
+model KpiTarget {
+  id        String   @id @default(cuid())
+  userId    String
+  metric    String
+  target    Float?
+  ramp      Json?
+  active    Boolean  @default(true)
+  sort      Int      @default(0)
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, metric])
+}
+
+model ManualKpiValue {
+  id          String   @id @default(cuid())
+  userId      String
+  metric      String
+  monthKey    String
+  value       Float
+  note        String?
+  enteredById String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, metric, monthKey])
+}
+
+model ScorecardMonth {
+  id        String   @id @default(cuid())
+  userId    String
+  monthKey  String
+  overall   String
+  results   Json
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, monthKey])
+}
+
+model PerformanceFlag {
+  id         String    @id @default(cuid())
+  userId     String
+  type       String
+  monthKey   String
+  note       String
+  status     String    @default("OPEN")
+  resolvedAt DateTime?
+  createdAt  DateTime  @default(now())
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, type, monthKey])
+}
+
+model MetricSnapshot {
+  id        String   @id @default(cuid())
+  metric    String
+  dateKey   String
+  value     Float
+  createdAt DateTime @default(now())
+
+  @@unique([metric, dateKey])
+}
+
+model OutreachLog {
+  id        String   @id @default(cuid())
+  userId    String
+  channel   String
+  count     Int      @default(1)
+  note      String?
+  leadId    String?
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+}
+
+model Incident {
+  id           String   @id @default(cuid())
+  clientId     String
+  taskId       String?
+  type         String
+  description  String
+  ownerId      String?
+  proofById    String?
+  reportedById String
+  createdAt    DateTime @default(now())
+  client       Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  task         Task?    @relation(fields: [taskId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt])
+}
+
+model OnboardingCheckpoint {
+  id            String    @id @default(cuid())
+  userId        String
+  day           Int
+  title         String
+  passLine      String
+  checks        Json
+  manual        Boolean   @default(false)
+  result        String    @default("PENDING")
+  detail        Json?
+  evaluatedAt   DateTime?
+  confirmedById String?
+  createdAt     DateTime  @default(now())
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, day])
+}
+
+model JobRun {
+  id        String   @id @default(cuid())
+  job       String
+  periodKey String
+  ranAt     DateTime @default(now())
+  result    String?
+
+  @@unique([job, periodKey])
+}
+
+model DigestLog {
+  id        String   @id @default(cuid())
+  dateKey   String   @unique
+  items     Int      @default(0)
+  html      String
+  text      String
+  emailed   Boolean  @default(false)
+  error     String?
+  createdAt DateTime @default(now())
+}
