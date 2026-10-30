@@ -36,12 +36,12 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
               <div className="nav-section">
                 <div className="nav-label">OPERATE</div>
                 <nav>
-                  {u.role === 'MD' && <Link href="/" data-icon="⌂">Command Centre</Link>}
-                  <Link href="/today" data-icon="☀">Today</Link>
-                  <Link href="/tasks" data-icon="✓">Work & Tasks</Link>
-                  <Link href="/clients" data-icon="◉">Clients</Link>
-                  {(u.role === 'MD' || u.role === 'DMM') && <Link href="/scopes" data-icon="↻">Client scopes</Link>}
-                  {(u.role === 'MD' || u.role === 'DMM') && <Link href="/exceptions" data-icon="!">Exceptions</Link>}
+                  {u.role === 'MD' && <Link href="/" prefetch={true} data-icon="⌂">Command Centre</Link>}
+                  <Link href="/today" prefetch={true} data-icon="☀">Today</Link>
+                  <Link href="/tasks" prefetch={true} data-icon="✓">Work & Tasks</Link>
+                  <Link href="/clients" prefetch={true} data-icon="◉">Clients</Link>
+                  {(u.role === 'MD' || u.role === 'DMM') && <Link href="/scopes" prefetch={true} data-icon="↻">Client scopes</Link>}
+                  {(u.role === 'MD' || u.role === 'DMM') && <Link href="/exceptions" prefetch={true} data-icon="!">Exceptions</Link>}
                 </nav>
               </div>
 
@@ -49,9 +49,9 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
                 <div className="nav-section">
                   <div className="nav-label">GROW</div>
                   <nav>
-                    {['MD', 'SALES'].includes(u.role) && <Link href="/crm" data-icon="↗">Sales CRM</Link>}
-                    {['MD', 'FINANCE'].includes(u.role) && <Link href="/finance" data-icon="₹">Finance</Link>}
-                    {u.role === 'MD' && <Link href="/payroll" data-icon="₹">Payroll</Link>}
+                    {['MD', 'SALES'].includes(u.role) && <Link href="/crm" prefetch={true} data-icon="↗">Sales CRM</Link>}
+                    {['MD', 'FINANCE'].includes(u.role) && <Link href="/finance" prefetch={true} data-icon="₹">Finance</Link>}
+                    {u.role === 'MD' && <Link href="/payroll" prefetch={true} data-icon="₹">Payroll</Link>}
                   </nav>
                 </div>
               )}
@@ -59,11 +59,11 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
               <div className="nav-section">
                 <div className="nav-label">PEOPLE</div>
                 <nav>
-                  <Link href="/scorecards" data-icon="◧">Scorecards</Link>
-                  {u.role === 'MD' && <Link href="/team" data-icon="✚">Team & targets</Link>}
-                  <Link href="/people" data-icon="◎">Attendance & Leave</Link>
-                  <Link href="/my-pay" data-icon="₹">My Pay</Link>
-                  <Link href="/account" data-icon="⚙">My Account</Link>
+                  <Link href="/scorecards" prefetch={true} data-icon="◧">Scorecards</Link>
+                  {u.role === 'MD' && <Link href="/team" prefetch={true} data-icon="✚">Team & targets</Link>}
+                  <Link href="/people" prefetch={true} data-icon="◎">Attendance & Leave</Link>
+                  <Link href="/my-pay" prefetch={true} data-icon="₹">My Pay</Link>
+                  <Link href="/account" prefetch={true} data-icon="⚙">My Account</Link>
                 </nav>
               </div>
 
@@ -71,8 +71,8 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
                 <div className="nav-section">
                   <div className="nav-label">INTELLIGENCE</div>
                   <nav>
-                    <Link href="/ai-coo" data-icon="✦">AI COO</Link>
-                    <Link href="/audit" data-icon="≡">Audit Trail</Link>
+                    <Link href="/ai-coo" prefetch={true} data-icon="✦">AI COO</Link>
+                    <Link href="/audit" prefetch={true} data-icon="≡">Audit Trail</Link>
                   </nav>
                 </div>
               )}

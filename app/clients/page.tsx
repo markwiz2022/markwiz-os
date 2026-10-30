@@ -1,32 +1,30 @@
 import { requirePageUser } from '@/lib/auth';
 import { db } from '@/lib/db';
-import { getClientHealthBreakdown } from '@/lib/client-health';
+import { getAllClientsHealthBreakdown } from '@/lib/client-health';
 import ClientForm from '@/components/client-form';
 
 export default async function Clients() {
   const u=await requirePageUser('clients');
+  const now = new Date();
 
-  const cs = await db.client.findMany({
-    where: { internal: false },
-    orderBy: { name: 'asc' },
-    include: {
-      projects: true,
-      tasks: true,
-      invoices: true,
-      meetings: true,
-    },
-  });
+  const [cs, healthMap] = await Promise.all([
+    db.client.findMany({
+      where: { internal: false },
+      orderBy: { name: 'asc' },
+      include: {
+        projects: true,
+        tasks: true,
+        invoices: true,
+        meetings: true,
+      },
+    }),
+    getAllClientsHealthBreakdown(db, undefined, now),
+  ]);
 
-  const clients = await Promise.all(
-    cs.map(async (client) => {
-      const health = await getClientHealthBreakdown(db, client.id);
-
-      return {
-        ...client,
-        health,
-      };
-    })
-  );
+  const clients = cs.map((client) => ({
+    ...client,
+    health: healthMap.get(client.id) ?? { score: 100, health: 'GREEN', issues: [], byOwner: {} },
+  }));
 
   return (
     <div className="page">

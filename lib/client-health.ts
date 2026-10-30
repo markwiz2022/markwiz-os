@@ -48,6 +48,112 @@ export function healthFromScore(score: number) {
   return score >= 75 ? ClientHealth.GREEN : score >= 50 ? ClientHealth.AMBER : ClientHealth.RED;
 }
 
+export async function getAllClientsHealthBreakdown(db: Db, clientIds?: string[], now = new Date()): Promise<Map<string, ClientHealthBreakdown>> {
+  const since = new Date(now.getTime() - 30 * 86400000);
+  const clientFilter = clientIds?.length ? { in: clientIds } : undefined;
+
+  const [tasks, incidents, invoices] = await Promise.all([
+    db.task.findMany({
+      where: {
+        ...(clientFilter ? { clientId: clientFilter } : { client: { active: true, internal: false } }),
+        status: { notIn: ['CLIENT', 'DONE'] },
+      },
+      include: { owner: { select: { id: true, name: true, role: true } } },
+      orderBy: { due: 'asc' },
+    }),
+    db.incident.findMany({
+      where: {
+        ...(clientFilter ? { clientId: clientFilter } : { client: { active: true, internal: false } }),
+        createdAt: { gte: since },
+      },
+      orderBy: { createdAt: 'desc' },
+    }),
+    db.invoice.findMany({
+      where: {
+        ...(clientFilter ? { clientId: clientFilter } : { client: { active: true, internal: false } }),
+        status: { not: 'DRAFT' },
+      },
+      select: { id: true, clientId: true, number: true, amount: true, paid: true, dueDate: true },
+    }),
+  ]);
+
+  const owners = new Map<string, { name: string; role: string }>();
+  const ownerIds = Array.from(new Set(incidents.map((i) => i.ownerId).filter((x): x is string => !!x)));
+  if (ownerIds.length) {
+    for (const u of await db.user.findMany({ where: { id: { in: ownerIds } }, select: { id: true, name: true, role: true } })) {
+      owners.set(u.id, { name: u.name, role: u.role });
+    }
+  }
+
+  const tasksByClient = new Map<string, typeof tasks>();
+  for (const t of tasks) {
+    const list = tasksByClient.get(t.clientId) ?? [];
+    list.push(t);
+    tasksByClient.set(t.clientId, list);
+  }
+  const incidentsByClient = new Map<string, typeof incidents>();
+  for (const i of incidents) {
+    const list = incidentsByClient.get(i.clientId) ?? [];
+    list.push(i);
+    incidentsByClient.set(i.clientId, list);
+  }
+  const invoicesByClient = new Map<string, typeof invoices>();
+  for (const inv of invoices) {
+    const list = invoicesByClient.get(inv.clientId) ?? [];
+    list.push(inv);
+    invoicesByClient.set(inv.clientId, list);
+  }
+
+  const allIds = new Set<string>([
+    ...(clientIds ?? []),
+    ...Array.from(tasksByClient.keys()),
+    ...Array.from(incidentsByClient.keys()),
+    ...Array.from(invoicesByClient.keys()),
+  ]);
+
+  const result = new Map<string, ClientHealthBreakdown>();
+
+  for (const cId of allIds) {
+    const cTasks = tasksByClient.get(cId) ?? [];
+    const cIncidents = incidentsByClient.get(cId) ?? [];
+    const cInvoices = invoicesByClient.get(cId) ?? [];
+
+    const issues: HealthIssue[] = [];
+    for (const t of cTasks) {
+      const late = isPastDue(t.due, now);
+      let deduction = 0;
+      let reason = '';
+      if (t.status === 'BLOCKED') { deduction = late ? 20 : 5; reason = late ? 'Blocked and overdue' : 'Blocked by another task'; }
+      else if (late) { deduction = 15; reason = 'Overdue'; }
+      if (!deduction) continue;
+      issues.push({ id: `task-${t.id}`, kind: 'TASK', taskId: t.id, task: t.desc, ownerId: t.owner.id, ownerName: t.owner.name, ownerRole: t.owner.role, status: String(t.status), due: t.due, reason, deduction });
+    }
+    for (const i of cIncidents) {
+      const o = i.ownerId ? owners.get(i.ownerId) : undefined;
+      issues.push({ id: `incident-${i.id}`, kind: 'INCIDENT', taskId: i.taskId, task: i.description, ownerId: i.ownerId, ownerName: o?.name ?? 'Account', ownerRole: o?.role ?? '—', status: i.type, due: i.createdAt, reason: INCIDENT_LABEL[i.type] ?? 'Incident', deduction: INCIDENT_POINTS[i.type] ?? 15 });
+    }
+    for (const inv of cInvoices) {
+      if (inv.amount <= inv.paid || !isPastDue(inv.dueDate, now)) continue;
+      const days = Math.floor((now.getTime() - inv.dueDate.getTime()) / 86400000);
+      issues.push({ id: `invoice-${inv.id}`, kind: 'INVOICE', taskId: null, task: `Invoice ${inv.number} unpaid`, ownerId: null, ownerName: 'Collections', ownerRole: 'MD', status: 'OVERDUE', due: inv.dueDate, reason: days > 15 ? 'Payment overdue 16+ days' : 'Payment overdue', deduction: days > 15 ? 20 : 10 });
+    }
+
+    issues.sort((a, b) => b.deduction - a.deduction);
+    const score = Math.max(0, 100 - issues.reduce((sum, x) => sum + x.deduction, 0));
+    const byOwner: ClientHealthBreakdown['byOwner'] = {};
+    for (const issue of issues) {
+      if (issue.kind === 'INVOICE') continue;
+      const key = issue.ownerId ?? 'unassigned';
+      byOwner[key] ??= { ownerId: issue.ownerId, ownerName: issue.ownerName, ownerRole: issue.ownerRole, deduction: 0, issues: [] };
+      byOwner[key].deduction += issue.deduction;
+      byOwner[key].issues.push(issue);
+    }
+    result.set(cId, { score, health: healthFromScore(score), issues, byOwner });
+  }
+
+  return result;
+}
+
 export async function getClientHealthBreakdown(db: Db, clientId: string, now = new Date()): Promise<ClientHealthBreakdown> {
   const since = new Date(now.getTime() - 30 * 86400000);
   const [tasks, incidents, invoices] = await Promise.all([

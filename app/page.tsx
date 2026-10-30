@@ -1,6 +1,6 @@
 import {currentUser} from '@/lib/auth';
 import {db} from '@/lib/db';
-import {getClientHealthBreakdown} from '@/lib/client-health';
+import {getAllClientsHealthBreakdown} from '@/lib/client-health';
 import {redirect} from 'next/navigation';
 import Link from 'next/link';
 import {isOverdue} from '@/lib/task-flow';
@@ -26,7 +26,8 @@ export default async function Home(){
     db.onboardingCheckpoint.count({where:{result:'CONFIRM'}})
   ]);
 
-  const healthClients=await Promise.all(clients.map(async c=>({client:c,health:await getClientHealthBreakdown(db,c.id)})));
+  const healthMap = await getAllClientsHealthBreakdown(db, clients.map(c => c.id), now);
+  const healthClients = clients.map(c => ({ client: c, health: healthMap.get(c.id) ?? { score: 100, health: 'GREEN', issues: [], byOwner: {} } }));
   const green=healthClients.filter(x=>x.health.health==='GREEN').length;
   const amber=healthClients.filter(x=>x.health.health==='AMBER').length;
   const red=healthClients.filter(x=>x.health.health==='RED').length;
