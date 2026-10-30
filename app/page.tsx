@@ -12,13 +12,18 @@ export default async function Home(){
   const now=new Date();
   const hour=Math.floor(istMinutes(now)/60);
   const greeting=hour<12?'Good morning':hour<17?'Good afternoon':'Good evening';
-  const [clients,tasks,leads,invoices,users,leave]=await Promise.all([
+  const todayKey=istDateKey(now);
+  const [clients,tasks,leads,invoices,users,leave,plans,sayDoPeople,openFlags,confirms]=await Promise.all([
     db.client.findMany({where:{active:true,internal:false},include:{tasks:{select:{status:true}}},orderBy:{healthScore:'asc'}}),
     db.task.findMany({where:{status:{notIn:['DONE','CLIENT']}},include:{client:true,owner:true},orderBy:{due:'asc'}}),
     db.lead.findMany({where:{stage:{not:'LOST'}},include:{owner:true}}),
     db.invoice.findMany({include:{client:true}}),
     db.user.findMany({where:{active:true}}),
-    db.leaveRequest.count({where:{status:'PENDING'}})
+    db.leaveRequest.count({where:{status:'PENDING'}}),
+    db.dailyPlan.count({where:{dateKey:todayKey,noPlan:false}}),
+    db.kpiTarget.count({where:{metric:'say_do',active:true,user:{active:true}}}),
+    db.performanceFlag.count({where:{status:'OPEN'}}),
+    db.onboardingCheckpoint.count({where:{result:'CONFIRM'}})
   ]);
 
   const healthClients=await Promise.all(clients.map(async c=>({client:c,health:await getClientHealthBreakdown(db,c.id)})));
@@ -33,14 +38,7 @@ export default async function Home(){
   const pipeline=leads.reduce((s,l)=>s+l.value*l.probability/100,0);
   const overdueTasks=tasks.filter(t=>isOverdue(t,now)).length;
   const todayTasks=tasks.filter(t=>istDateKey(t.due)===istDateKey(now)).length;
-  const todayKey=istDateKey(now);
-  const [plans,sayDoPeople,openFlags,confirms,lateClient]=await Promise.all([
-    db.dailyPlan.count({where:{dateKey:todayKey,noPlan:false}}),
-    db.kpiTarget.count({where:{metric:'say_do',active:true,user:{active:true}}}),
-    db.performanceFlag.count({where:{status:'OPEN'}}),
-    db.onboardingCheckpoint.count({where:{result:'CONFIRM'}}),
-    Promise.resolve(tasks.filter(t=>t.clientFacing&&!t.client.internal&&isOverdue(t,now)).length),
-  ]);
+  const lateClient=tasks.filter(t=>t.clientFacing&&!t.client.internal&&isOverdue(t,now)).length;
   const noNextAction=leads.filter(l=>!['WON','LOST'].includes(l.stage)&&!l.nextAction).length;
   const overdueInvoices=invoices.filter(i=>i.amount>i.paid&&new Date(i.dueDate)<now);
   const working=users.filter(x=>x.checkInAt&&!x.checkOutAt).length;

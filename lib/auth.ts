@@ -1,4 +1,5 @@
 import { cookies } from 'next/headers';
+import { cache } from 'react';
 import { jwtVerify, SignJWT } from 'jose';
 import bcrypt from 'bcryptjs';
 import { db } from './db';
@@ -16,11 +17,17 @@ export async function setSession(userId:string){
   (await cookies()).set('mw_session',token,{httpOnly:true,secure:process.env.NODE_ENV==='production',sameSite:'lax',path:'/',maxAge:604800})
 }
 export async function clearSession(){(await cookies()).delete('mw_session')}
-export async function currentUser(){
-  const token=(await cookies()).get('mw_session')?.value;
-  if(!token)return null;
-  try{const {payload}=await jwtVerify(token,secret);if(!payload.sub)return null;return db.user.findUnique({where:{id:String(payload.sub)}})}catch{return null}
-}
+export const currentUser = cache(async () => {
+  const token = (await cookies()).get('mw_session')?.value;
+  if (!token) return null;
+  try {
+    const { payload } = await jwtVerify(token, secret);
+    if (!payload.sub) return null;
+    return db.user.findUnique({ where: { id: String(payload.sub) } });
+  } catch {
+    return null;
+  }
+});
 export function can(role:string, permission:string){const map:Record<string,string[]> = {
   MD: ['*'],
   DMM: ['clients','projects','tasks','people'],
