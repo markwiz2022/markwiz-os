@@ -1,21 +1,29 @@
 import nodemailer from 'nodemailer';
 
 export function emailConfigured() {
-  return !!process.env.SMTP_HOST;
+  const host = (process.env.SMTP_HOST || '').replace(/^["']|["']$/g, '').trim();
+  return !!host;
 }
 
 export function transport() {
-  if (process.env.SMTP_HOST === 'test') {
+  const host = (process.env.SMTP_HOST || '').replace(/^["']|["']$/g, '').trim();
+  if (host === 'test') {
     return nodemailer.createTransport({ jsonTransport: true });
   }
-  const port = Number(process.env.SMTP_PORT || 587);
+  const rawPort = (process.env.SMTP_PORT || '465').replace(/[^0-9]/g, '');
+  const port = Number(rawPort) || 465;
+  const isSecure = process.env.SMTP_SECURE === 'true' || port === 465;
+  const user = (process.env.SMTP_USER || '').replace(/^["']|["']$/g, '').trim();
+  const pass = (process.env.SMTP_PASS || '').replace(/^["']|["']$/g, '').replace(/\s+/g, '');
+
   return nodemailer.createTransport({
-    host: process.env.SMTP_HOST,
+    host,
     port,
-    secure: port === 465,
-    auth: process.env.SMTP_USER
-      ? { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS }
-      : undefined,
+    secure: isSecure,
+    auth: user ? { user, pass } : undefined,
+    connectionTimeout: 10000,
+    greetingTimeout: 10000,
+    socketTimeout: 15000,
   });
 }
 
@@ -66,13 +74,18 @@ export async function sendPasswordResetEmail({
 
   const text = `${greeting}\n\nA request was made to reset your Markwiz account password.\nReset your password here (valid for 1 hour):\n${resetUrl}\n\nIf you did not request this, you can safely ignore this email.`;
 
-  const info = await transport().sendMail({
-    from,
-    to,
-    subject: 'Reset your Markwiz OS password',
-    text,
-    html,
-  });
-
-  return { ok: true, messageId: info.messageId };
+  try {
+    const info = await transport().sendMail({
+      from,
+      to,
+      subject: 'Reset your Markwiz OS password',
+      text,
+      html,
+    });
+    console.log(`[SMTP SUCCESS] Password reset email sent to ${to}. MessageId: ${info.messageId}`);
+    return { ok: true, messageId: info.messageId };
+  } catch (err: any) {
+    console.error(`[SMTP ERROR] Failed to send email to ${to}:`, err?.message || err);
+    return { ok: false, error: err?.message || 'SMTP delivery failed' };
+  }
 }

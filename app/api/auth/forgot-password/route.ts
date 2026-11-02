@@ -18,40 +18,60 @@ export async function POST(req: Request) {
       select: { id: true, name: true, email: true, active: true },
     });
 
-    if (user && user.active) {
-      // Clean up any old tokens for this email
-      await db.passwordResetToken.deleteMany({
-        where: { email },
-      });
-
-      // Generate a cryptographically strong 32-byte token
-      const token = crypto.randomBytes(32).toString('hex');
-      const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
-
-      await db.passwordResetToken.create({
-        data: {
-          email,
-          token,
-          expiresAt,
-        },
-      });
-
-      // Determine base URL: prioritize APP_URL, then request origin
-      const origin = process.env.APP_URL || new URL(req.url).origin;
-      const resetUrl = `${origin}/reset-password?token=${token}`;
-
-      await sendPasswordResetEmail({
-        to: email,
-        name: user.name,
-        resetUrl,
-      });
-
-      await audit(user.id, 'FORGOT_PASSWORD_REQUESTED', 'User', user.id, { email });
+    if (!user) {
+      return NextResponse.json(
+        { error: `No Markwiz account found for "${email}". Please verify your email address.` },
+        { status: 404 }
+      );
     }
+
+    if (!user.active) {
+      return NextResponse.json(
+        { error: 'This account is inactive. Please contact Joseph / MD.' },
+        { status: 403 }
+      );
+    }
+
+    // Clean up any old tokens for this email
+    await db.passwordResetToken.deleteMany({
+      where: { email },
+    });
+
+    // Generate a cryptographically strong 32-byte token
+    const token = crypto.randomBytes(32).toString('hex');
+    const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+
+    await db.passwordResetToken.create({
+      data: {
+        email,
+        token,
+        expiresAt,
+      },
+    });
+
+    // Determine base URL: prioritize APP_URL, then request origin
+    const origin = process.env.APP_URL || new URL(req.url).origin;
+    const resetUrl = `${origin}/reset-password?token=${token}`;
+
+    const emailResult = await sendPasswordResetEmail({
+      to: email,
+      name: user.name,
+      resetUrl,
+    });
+
+    if (!emailResult.ok) {
+      console.error(`[FORGOT PASSWORD ERROR] Failed to send email to ${email}:`, emailResult.error);
+      return NextResponse.json(
+        { error: `Failed to send email: ${emailResult.error}` },
+        { status: 502 }
+      );
+    }
+
+    await audit(user.id, 'FORGOT_PASSWORD_REQUESTED', 'User', user.id, { email });
 
     return NextResponse.json({
       ok: true,
-      message: 'If an account exists with that email, a password reset link has been sent.',
+      message: `A password reset link has been sent to ${email}. Please check your inbox (and spam folder).`,
     });
   } catch (err) {
     console.error('Forgot password error:', err);
