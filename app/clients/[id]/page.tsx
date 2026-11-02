@@ -5,6 +5,7 @@ import { db } from '@/lib/db';
 import { getClientHealthBreakdown } from '@/lib/client-health';
 import ProjectForm from '@/components/project-form';
 import ClientEdit from '@/components/client-edit';
+import ClientDangerZone from '@/components/client-delete';
 import { IncidentForm } from '@/components/ops';
 import { INCIDENT_LABEL } from '@/lib/client-health';
 import { describeCadence } from '@/lib/scope';
@@ -44,6 +45,7 @@ export default async function ClientDetail({params}:{params:Promise<{id:string}>
   ].sort((a,b)=>new Date(b.date).getTime()-new Date(a.date).getTime()).slice(0,8);
 
   return <div className="page client-workspace">
+    {!c.active&&<div className="card warn-card"><h3>This client is archived</h3><p className="muted">It’s hidden from lists, scopes, the content calendar and reports. {u.role==='MD'?'Restore it from Archive / delete in the Client profile panel.':'Ask the MD to restore it.'}</p></div>}
     <div className="client-hero">
       <div>
         <Link href="/clients" className="back">← All clients</Link>
@@ -80,6 +82,7 @@ export default async function ClientDetail({params}:{params:Promise<{id:string}>
         </div>
         {c.notes&&<div className="notes-box"><span>ACCOUNT NOTES</span><p>{c.notes}</p></div>}
         <div style={{marginTop:14}}><ClientEdit isMD={u.role==='MD'} client={{id:c.id,name:c.name,company:c.company,industry:c.industry,accountManager:c.accountManager,notes:c.notes,email:c.email,phone:c.phone,website:c.website,retainer:c.retainer,renewalDate:c.renewalDate?new Date(c.renewalDate).toISOString():null}} /></div>
+        <div style={{marginTop:8}}><ClientDangerZone client={{id:c.id,name:c.name,active:c.active}} counts={{tasks:c.tasks.length,invoices:c.invoices.length}} /></div>
       </section>}
     </div>
 

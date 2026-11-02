@@ -3,18 +3,20 @@ import { db } from '@/lib/db';
 import { getClientHealthBreakdown } from '@/lib/client-health';
 import ClientForm from '@/components/client-form';
 import ClientEdit from '@/components/client-edit';
+import ClientDangerZone from '@/components/client-delete';
 import Link from 'next/link';
 import { canCreateClients } from '@/lib/settings';
 
-export default async function Clients({ searchParams }: { searchParams: Promise<{ q?: string; health?: string }> }) {
+export default async function Clients({ searchParams }: { searchParams: Promise<{ q?: string; health?: string; status?: string }> }) {
   const u=await requirePageUser('clients');
   const sp=await searchParams;
   const q=(sp.q??'').trim().toLowerCase();
   const fHealth=['GREEN','AMBER','RED'].includes(sp.health??'')?sp.health!:'';
   const canAdd=await canCreateClients(u);
+  const status=sp.status==='archived'?'archived':sp.status==='all'?'all':'active';
 
   const cs = await db.client.findMany({
-    where: { internal: false },
+    where: { internal: false, ...(status==='active'?{active:true}:status==='archived'?{active:false}:{}) },
     orderBy: { name: 'asc' },
     include: {
       projects: true,
@@ -37,7 +39,7 @@ export default async function Clients({ searchParams }: { searchParams: Promise<
   const clients = allClients.filter((c) =>
     (!q || [c.name, c.company, c.industry, c.accountManager].some((v) => v?.toLowerCase().includes(q))) &&
     (!fHealth || c.health.health === fHealth));
-  const filtered = Boolean(q || fHealth);
+  const filtered = Boolean(q || fHealth || status !== 'active');
 
   return (
     <div className="page">
@@ -56,6 +58,7 @@ export default async function Clients({ searchParams }: { searchParams: Promise<
       <form className="card filter-bar" method="get" action="/clients" style={{ marginBottom: 14 }}>
         <input name="q" defaultValue={sp.q ?? ''} placeholder="Search client, company, industry or manager" />
         <select name="health" defaultValue={fHealth}><option value="">Any health</option><option value="RED">Red</option><option value="AMBER">Amber</option><option value="GREEN">Green</option></select>
+        <select name="status" defaultValue={status}><option value="active">Active clients</option><option value="archived">Archived</option><option value="all">All</option></select>
         <button className="btn secondary small" type="submit">Filter</button>
         {filtered && <Link className="btn secondary small" href="/clients">Clear</Link>}
         <span className="muted">{clients.length} of {allClients.length} clients</span>
@@ -109,6 +112,8 @@ export default async function Clients({ searchParams }: { searchParams: Promise<
                   renewalDate: c.renewalDate ? new Date(c.renewalDate).toISOString() : null,
                 }}
               />
+              {u.role==='MD'&&<div style={{ marginTop: 8 }}><ClientDangerZone client={{ id: c.id, name: c.name, active: c.active }} counts={{ tasks: c.tasks.length, invoices: c.invoices.length }} /></div>}
+              {!c.active&&<span className="pill amber" style={{ marginTop: 8 }}>Archived</span>}
 
               {u.role==='MD'&&<div className="muted" style={{ marginBottom: 14 }}>{c.email || 'No email'} · {c.website || 'No website'}</div>}
 
