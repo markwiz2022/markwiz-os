@@ -73,8 +73,8 @@ export async function POST(req: Request) {
       ok: true,
       message: `A password reset link has been sent to ${email}. Please check your inbox (and spam folder).`,
     });
-  } catch (err) {
+  } catch (err: any) {
     console.error('Forgot password error:', err);
-    return NextResponse.json({ error: 'Failed to process request. Please try again later.' }, { status: 500 });
+    return NextResponse.json({ error: err?.message || 'Failed to process request. Please try again later.' }, { status: 500 });
   }
 }
