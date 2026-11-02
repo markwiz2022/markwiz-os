@@ -3,7 +3,8 @@ import { db } from '@/lib/db';
 import { errorResponse, guard } from '@/lib/api';
 import { canManage, FlowError } from '@/lib/task-flow';
 
-const MAX = 5 * 1024 * 1024;
+// 4 MB: Vercel rejects request bodies over 4.5 MB, so keep uploads under that on every host.
+const MAX = 4 * 1024 * 1024;
 const TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/gif'];
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -19,7 +20,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     const file = form.get('file');
     if (!(file instanceof File)) throw new FlowError('Choose an image to upload.', 400);
     if (!TYPES.includes(file.type)) throw new FlowError('Upload a JPG, PNG, WEBP or GIF. For video or websites, paste a link instead.', 400);
-    if (file.size > MAX) throw new FlowError('Image is larger than 5 MB. Export a smaller JPG.', 400);
+    if (file.size > MAX) throw new FlowError('Image is larger than 4 MB. Export a smaller JPG, or paste a Google Drive link instead.', 400);
     const data = Buffer.from(await file.arrayBuffer());
     const saved = await db.taskFile.create({ data: { taskId: id, uploadedById: u.id, name: file.name.slice(0, 200), mime: file.type, size: file.size, data } });
     await db.taskEvent.create({ data: { taskId: id, userId: u.id, type: 'FILE_UPLOADED', note: file.name.slice(0, 200) } });

@@ -27,7 +27,7 @@ export default async function Exceptions() {
       <div className="priority-list">{s.items.map((i, k) => <div className="priority" key={k}><div style={{ flex: 1 }}>{i.href ? <Link className="client-link" href={i.href}><b>{i.title}</b></Link> : <b>{i.title}</b>}<div className="muted">{i.detail}</div></div></div>)}</div>
     </section>)}</div>
     {isMD && <div className="grid2" style={{ marginTop: 14 }}>
-      <section className="card"><div className="section-head"><div><h3>Autopilot status</h3><p className="muted">Jobs that run by themselves. If a time has passed and a job shows nothing, tell Gopi.</p></div></div>
+      <section className="card"><div className="section-head"><div><h3>Autopilot status</h3><p className="muted">Jobs that run by themselves. If a time has passed and a job shows nothing, tell the developer.</p></div></div>
         <div className="detail-list">
           <div><span>AI spell check</span><b className={aiProofEnabled() ? '' : 'danger-text'}>{aiProofEnabled() ? 'On' : 'Off: needs ANTHROPIC_API_KEY'}</b></div>
           <div><span>Digest email</span><b className={emailConfigured() ? '' : 'danger-text'}>{emailConfigured() ? 'On' : 'Off: needs SMTP settings'}</b></div>

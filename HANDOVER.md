@@ -14,8 +14,11 @@ cp .env.example .env
 npm install
 npm run db:push      # creates prisma/dev.db from the schema
 npm run db:seed      # loads DUMMY clients, leads, invoices, expenses and salaries
+npm run check        # type check, tests and a full build. Must end with "All checks passed."
 npm run dev          # http://localhost:3000
 ```
+
+Already installed? See **section 10** for update steps and **section 11** before changing any code.
 
 Generate a secret with: `node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"`
 
@@ -207,3 +210,158 @@ any response), plus 40 checks of the time-based rules (calendar, ratings, Say/Do
 escalation, auto-close, flags, ramps, checkpoints, scheduler idempotency). The real Claude API and a real
 SMTP server were not called from the test environment; add the keys and use **Run AI check** and
 **Send today's digest now** once to confirm on the server.
+
+## 10. Round four (2 Nov 2026)
+
+### Updating an existing install to this version
+
+1. Stop the app (Ctrl+C in the window running `npm run dev`).
+2. Copy the new files over the old folder. Keep your `.env` and `prisma/dev.db`; they are not in the zip.
+3. `npm install`
+4. `npm run db:update`. This backs up the database into `backups/` first, then adds the new tables and
+   column (`LoginAttempt`, `AppSetting`, `Lead.lostReason`). Nothing is removed or changed in existing data.
+5. `npm run check`, then `npm run dev`.
+
+On a server with PostgreSQL, take a backup with your host first, then run `npx prisma db push`.
+
+### Privacy and correctness fixes
+
+- **Work & Tasks** sent every open task to every user. Staff now load only their own and assigned work,
+  proof checks, and reviews they are allowed to release. The task-dependency list is limited the same way.
+- **Command Centre** showed every team member's overdue tasks to all staff. Non-leads now see only their
+  own and assigned work; invoices load only for the MD, and pipeline only for MD and Sales.
+- **Finance contribution** subtracted all expenses and payroll ever recorded from one month's retainers.
+  It now compares the same month on both sides, with a month picker.
+- **People:** the "2/2 used this month" counter counted every request ever made. It now counts the month
+  of each request, matching the API rule. Late-check-in wording now uses the 9:15 AM grace time
+  everywhere, including the late check-in box.
+- **Login** now locks an email for 15 minutes after 5 failed attempts (20 per network address). Stored in
+  the database, so it works on Vercel or several servers. Failed attempts on a real account are audited.
+- Staff-facing messages no longer name the developer.
+- Payroll and People API routes returned a 500 when logged out. They now return 401 (closes a known gap).
+
+### New features
+
+- **Finance:** edit any invoice or expense, delete (MD only; the full record is kept in the audit trail),
+  month picker, CSV export of invoices and expenses. Duplicate invoice numbers are refused.
+- **Payroll:** open any past month (to process last month's salaries) and export the month as CSV.
+- **Audit Trail:** filters by person, action, area and date, search, 50 per page, readable "what changed"
+  column, CSV export (up to 10,000 rows).
+- **Sales CRM:** edit a lead (value, probability, source, next action, follow-up, contact, notes); a fixed
+  list of lead sources; a reason is required when a lead is marked Lost; "Leads by source" and
+  "Why leads are lost" reports. List values live in `lib/crm.ts`.
+- **Clients:** Edit client on each card and on the client page; search and health filter. Who can add
+  clients is now a setting on **Team & targets** (it was hard-coded to one email). The API enforces it.
+- **Client scopes:** edit a recurring deliverable. Changes apply from the next task it creates.
+- **Team & targets:** search and filter; edit a person's name and sign-in email.
+- **AI COO:** the review list is built from live data (overdue work, at-risk clients, overdue invoices,
+  renewals in the next 30 days, sales follow-ups, clients without scope, last month's payroll, pending
+  approvals), each linking to where you act on it.
+
+### New files
+
+`lib/csv.ts`, `lib/audit-query.ts`, `lib/crm.ts`, `lib/rate-limit.ts`, `lib/settings.ts`,
+`components/client-edit.tsx`, `components/finance-row-actions.tsx`, `components/scope-edit.tsx`,
+`components/team-extra.tsx`, `app/api/finance/export`, `app/api/audit/export`, `app/api/payroll/export`,
+`app/api/settings`, `scripts/backup-db.mjs`, `tests/rules.test.ts`.
+
+### Still open
+
+- No password reset by email (the MD resets passwords in My Account).
+- Expense approval requests and per-client profitability are still designed but not built.
+- Work & Tasks has search and filters but no paging; fine for hundreds of open tasks.
+- `npm install` reports dependency advisories. Update with care (`npm audit`), never `--force` without
+  running `npm run check` afterwards.
+
+## 11. Making changes safely
+
+Run these from the project folder.
+
+| Command | When | What it does |
+|---|---|---|
+| `npm run backup` | Before any risky change or bulk data entry | Copies `prisma/dev.db` into `backups/` with a timestamp (keeps the last 30) |
+| `npm run check` | After **every** code change, before using or deploying it | Type-checks all code, runs the rule tests, and does a full production build in `.next-check` (safe while `npm run dev` is running). Ends with "All checks passed." |
+| `npm test` | Quick check after changing a business rule | Runs `tests/rules.test.ts` (calendar, late check-in, task visibility, release levels, CSV, audit) |
+| `npm run db:update` | After any change to `prisma/schema.prisma` | Backs up, then applies the schema. Prisma refuses changes that would delete data unless told to. |
+| `npm run clean-start` | Once, before real use | Shows the demo data; add `-- --confirm` to remove it and `--reset-passwords` to issue new passwords |
+
+Rules for changes:
+
+1. **Back up, change, check.** `npm run backup` → make the change → `npm run check`. Only use or deploy
+   it when the check passes.
+2. **Schema changes only add.** Add new optional columns or new tables. Never rename or delete a column
+   that holds data; add a new one and migrate. If `db push` warns about data loss, stop.
+3. **Business rules live in one place:** calendar and check-in times in `lib/workcalendar.ts`, task flow
+   in `lib/task-flow.ts`, CRM lists in `lib/crm.ts`, settings in `lib/settings.ts`. Change them there,
+   then add or update a test in `tests/rules.test.ts`.
+4. **Settings before code.** Where the MD should control something (like who can add clients), add an
+   `AppSetting` with a safe default in `lib/settings.ts` rather than hard-coding names or emails.
+5. **To undo a bad database change:** stop the app, copy the latest file from `backups/` over
+   `prisma/dev.db`, start the app.
+6. **Use git.** `git init` once, then `git add -A && git commit -m "what changed"` after each passing
+   check, so any change can be undone with `git checkout`.
+
+## 12. Going live on Vercel (step by step)
+
+Do these in order. Steps 1–6 take about an hour.
+
+1. **Database.** In the Vercel project: Storage → Create → Neon (Postgres). Connect it to the project.
+   This adds `DATABASE_URL` and `DATABASE_URL_UNPOOLED`. The app switches to PostgreSQL automatically when
+   `DATABASE_URL` starts with `postgres` (`scripts/db-provider.mjs`); the Mac keeps using SQLite.
+2. **Environment variables** (Project → Settings → Environment Variables, Production):
+   `JWT_SECRET` (48+ random characters), `APP_URL` (the live address), `SCHEDULER=off`,
+   `CRON_SECRET` (16+ random characters). Optional: SMTP settings and `ANTHROPIC_API_KEY` (see `.env.example`).
+3. **Create the tables.** On a Mac, in the project folder, put the two Neon URLs in a temporary
+   `.env.production.local` or export them in the terminal, then run `npx prisma db push`
+   (`node scripts/db-provider.mjs` first if the schema still says sqlite). Or run it once from Vercel's build
+   by adding `&& prisma db push` to the build command temporarily.
+4. **Deploy** (push to the connected Git branch, or `vercel --prod`). Vercel runs `npm run build`.
+5. **Scheduled jobs.** `vercel.json` calls `/api/cron` daily at 07:10, 18:10, 19:10 and 02:10 IST. That
+   covers every job (scope tasks, checkpoints, auto-close, Say/Do close, snapshots, 7 PM digest, month close),
+   because each run catches up anything that is due. On the Hobby plan Vercel may run each call up to an hour
+   late; on Pro you can replace the four entries with one `"*/10 * * * *"`. Check **Exceptions → Autopilot
+   status** the next day: every job should say "Ran".
+6. **First login and clean start.** Sign in as the MD. Locally with the same database settings, run
+   `npm run clean-start` to see the demo data, then `npm run clean-start -- --confirm --reset-passwords`.
+   Share each new password privately; everyone changes theirs on My Account. Set real salaries in Payroll.
+7. **Backups.** Neon keeps point-in-time history (check your plan's restore window). Also export a copy
+   weekly: `pg_dump "$DATABASE_URL_UNPOOLED" > markwiz-YYYYMMDD.sql`, stored outside Vercel.
+8. **Email.** For digests and client reports, set `SMTP_HOST=smtp.gmail.com`, `SMTP_PORT=587`,
+   `SMTP_USER` (a Workspace mailbox), `SMTP_PASS` (an App Password for it) and `SMTP_FROM`.
+9. **Logo on reports.** Add `public/report-logo.png` (about 300 × 80 px, transparent background).
+
+Phones: staff open the live address in their phone browser and choose **Add to Home Screen**. Locally, a
+phone on the same Wi-Fi can open the "Network" address that `npm run dev` prints.
+
+Uploads are limited to 4 MB (Vercel's request limit is 4.5 MB) and are stored in the database. When the
+database grows past a few GB, move files to Vercel Blob or S3.
+
+## 13. Round five (2 Nov 2026)
+
+Update an existing install the same way as section 10: copy the files over, `npm install`,
+`npm run db:update`, `npm run check`. New tables: `ContentPost`, `ClientReport`; new column `Lead.clientId`.
+
+- **Won lead becomes a client.** Marking a lead Won creates the client (or links an existing one with the same
+  name) with the lead's contact details and monthly value as the retainer, and asks the MD and DMMs to load
+  its scope. Older won leads show a "Create client record" button. Code: `lib/lead-convert.ts`.
+- **Client profitability** (MD, `/profitability`). Per client per month: retainer minus logged task time
+  (salary ÷ (8 h × working days) per person) minus client expenses. Shows time-logging coverage, because
+  unlogged time makes clients look more profitable than they are. `HOURS_PER_DAY` is in
+  `lib/profitability.ts`.
+- **Content calendar** (`/content`). Month grid on desktop, list on phones. MD/DMM plan posts and create the
+  design task in one click (the caption becomes approved copy). Status follows the task; the task owner can
+  mark the post Posted with the live link. Export a month's plan as CSV to share with the client. Lists:
+  `lib/content.ts`.
+- **Weekly client reports** (MD/DMM, `/reports`). Delivered this week, waiting on client feedback, content,
+  in progress and next week, from tasks and the calendar. Never includes health scores, money or internal
+  notes. Preview, add a personal note, then email (replies go to the sender) or Print / Save as PDF. Nothing
+  is sent automatically; every send is logged. Code: `lib/client-report.ts`.
+- **Phones.** Top bar with Menu (closes after each tap), two-column KPIs, full-width 16 px form fields (no
+  iPhone zoom), tables scroll sideways inside their card, content scaled up for readability. Styles are at
+  the end of `app/globals.css`.
+- **Help & guide** page for staff (`/help`).
+- **Go-live tooling:** automatic SQLite/PostgreSQL switch, `vercel.json` schedule, `npm run clean-start`,
+  `.env.example` rewritten for Vercel and Google Workspace email.
+- **Security updates:** Next.js 15.5.28 (fixes the critical advisory), nodemailer 10, zod, sharp, postcss.
+  Remaining advisories are in the Prisma command-line tool and Next's build-time postcss copy; they don't run
+  in the live app. Fixing Prisma needs Prisma 7, a breaking upgrade best done separately.

@@ -31,13 +31,11 @@ export default async function Today() {
   let team: { id: string; name: string; clockedIn: boolean; items: number; done: number; late: boolean; noPlan: boolean }[] = [];
   if (lead) {
     const people = await db.user.findMany({ where: { active: true, kpiTargets: { some: { metric: 'say_do', active: true } } }, select: { id: true, name: true, role: true, seat: true }, orderBy: { name: 'asc' } });
-    const eligible = people.filter((p) => u.role === 'MD' || isDeliveryLane(p));
-    team = await Promise.all(eligible.map(async (p) => {
+    for (const p of people.filter((p) => u.role === 'MD' || isDeliveryLane(p))) {
       const pl = await db.dailyPlan.findUnique({ where: { userId_dateKey: { userId: p.id, dateKey: w.dateKey } }, include: { items: true } });
       const prog = pl && !pl.noPlan ? await planProgress(db, pl, now) : [];
-      const clockedIn = await clockedInOn(db, p.id, w.dateKey);
-      return { id: p.id, name: p.name, clockedIn, items: pl?.items.length ?? 0, done: prog.filter((x) => x.done).length, late: !!pl?.late, noPlan: !!pl?.noPlan };
-    }));
+      team.push({ id: p.id, name: p.name, clockedIn: await clockedInOn(db, p.id, w.dateKey), items: pl?.items.length ?? 0, done: prog.filter((x) => x.done).length, late: !!pl?.late, noPlan: !!pl?.noPlan });
+    }
   }
 
   const dateLabel = now.toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'Asia/Kolkata' });

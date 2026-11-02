@@ -4,28 +4,38 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "prisma generate && next build",
+    "build": "node scripts/db-provider.mjs && prisma generate && next build",
     "start": "next start",
-    "db:push": "prisma db push",
-    "db:seed": "tsx prisma/seed.ts"
+    "typecheck": "node scripts/db-provider.mjs && prisma generate && tsc --noEmit",
+    "test": "node --import tsx --test tests/*.test.ts",
+    "check": "npm run typecheck && npm test && NEXT_DIST_DIR=.next-check next build && echo 'All checks passed. Safe to use.'",
+    "backup": "node scripts/backup-db.mjs",
+    "db:update": "node scripts/db-provider.mjs && node scripts/backup-db.mjs && prisma db push",
+    "db:push": "node scripts/db-provider.mjs && prisma db push",
+    "db:seed": "tsx prisma/seed.ts",
+    "clean-start": "tsx scripts/clean-start.ts",
+    "postinstall": "node scripts/db-provider.mjs && prisma generate"
   },
   "dependencies": {
     "@prisma/client": "^6.14.0",
     "bcryptjs": "^3.0.2",
     "jose": "^6.0.12",
     "next": "^15.5.0",
-    "nodemailer": "^6.10.1",
+    "nodemailer": "^10.3.1",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
     "zod": "^4.0.17"
   },
   "devDependencies": {
     "@types/node": "^22.18.0",
-    "@types/nodemailer": "^6.4.24",
+    "@types/nodemailer": "^8.0.2",
     "@types/react": "^19.1.10",
     "@types/react-dom": "^19.1.7",
     "prisma": "^6.14.0",
     "tsx": "^4.20.3",
     "typescript": "^5.9.2"
+  },
+  "engines": {
+    "node": ">=20"
   }
 }

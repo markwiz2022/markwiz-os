@@ -1,10 +1,11 @@
+import { guard } from '@/lib/api';
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { requireUser } from '@/lib/auth';
 import { audit } from '@/lib/audit';
 
 export async function PATCH(req: Request) {
-  const u = await requireUser();
+  const g = await guard('*'); if (g.error) return g.error;
+  const u = g.user!;
   if (u.role !== 'MD') return NextResponse.json({ error: 'Only Joseph/MD can update salaries.' }, { status: 403 });
   const b = await req.json();
   const amount = Number(b.monthlySalary);

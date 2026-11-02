@@ -4,6 +4,7 @@ import { requirePageUser } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { getClientHealthBreakdown } from '@/lib/client-health';
 import ProjectForm from '@/components/project-form';
+import ClientEdit from '@/components/client-edit';
 import { IncidentForm } from '@/components/ops';
 import { INCIDENT_LABEL } from '@/lib/client-health';
 import { describeCadence } from '@/lib/scope';
@@ -52,7 +53,7 @@ export default async function ClientDetail({params}:{params:Promise<{id:string}>
           <span className={`health-badge ${health.health.toLowerCase()}`}><i/>{health.health}<strong>{health.score}</strong></span>
         </div>
       </div>
-      <div className="hero-actions"><Link className="btn secondary" href="/tasks">Open tasks</Link><Link className="btn" href="/crm">Open CRM</Link></div>
+      <div className="hero-actions"><Link className="btn secondary" href={`/tasks?view=${lead?'all':'mine'}&client=${c.id}`}>Open tasks</Link><Link className="btn secondary" href={`/content?client=${c.id}`}>Content calendar</Link>{lead&&<Link className="btn secondary" href={`/reports/${c.id}`}>Weekly report</Link>}{(u.role==='MD'||u.role==='SALES')&&<Link className="btn" href="/crm">Open CRM</Link>}</div>
     </div>
 
     <div className="client-kpis">
@@ -78,6 +79,7 @@ export default async function ClientDetail({params}:{params:Promise<{id:string}>
           <div><span>Website</span><b>{c.website||'—'}</b></div><div><span>Phone</span><b>{c.phone||'—'}</b></div><div><span>Account manager</span><b>{c.accountManager||'Unassigned'}</b></div><div><span>Industry</span><b>{c.industry||'—'}</b></div><div><span>Started</span><b>{date(c.startDate)}</b></div><div><span>Renewal</span><b>{date(c.renewalDate)}</b></div>
         </div>
         {c.notes&&<div className="notes-box"><span>ACCOUNT NOTES</span><p>{c.notes}</p></div>}
+        <div style={{marginTop:14}}><ClientEdit isMD={u.role==='MD'} client={{id:c.id,name:c.name,company:c.company,industry:c.industry,accountManager:c.accountManager,notes:c.notes,email:c.email,phone:c.phone,website:c.website,retainer:c.retainer,renewalDate:c.renewalDate?new Date(c.renewalDate).toISOString():null}} /></div>
       </section>}
     </div>
 

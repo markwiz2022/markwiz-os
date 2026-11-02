@@ -19,7 +19,7 @@ Markwiz OS is the internal operating system for Markwiz Marketing Consultancy.
 - Notifications: task assignment, leave and client-health responsibility alerts
 - Audit Trail: recorded operational changes for MD review
 
-**Developers: read `HANDOVER.md` first** (setup, dummy logins, permissions, deployment checklist).
+**Developers: read `HANDOVER.md` first** (setup, dummy logins, permissions, deployment checklist). Before and after any change: `npm run backup`, then `npm run check` (section 11).
 
 ## Local development
 

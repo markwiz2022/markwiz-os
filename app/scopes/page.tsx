@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { requirePageUser } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { GenerateNow, ScopeForm, ScopeToggle } from '@/components/ops';
+import ScopeEdit from '@/components/scope-edit';
 import { describeCadence, dueKeyFor, periodKeyFor } from '@/lib/scope';
 import { CATEGORIES, STATUS_LABEL } from '@/lib/task-flow';
 import { shortKeyLabel } from '@/lib/workcalendar';
@@ -30,7 +31,7 @@ export default async function Scopes() {
           <td>{nameOf(i.ownerId)}</td>
           <td>{[i.needsCopy && 'Copy', i.needsProof && 'Proof', i.approvalLevel].filter(Boolean).join(' · ')}</td>
           <td>{!i.active ? <span className="muted">Paused</span> : t ? <Link href={`/tasks/${t.id}`} className="pill">{STATUS_LABEL[t.status]}</Link> : <span className="muted">Created at the next period</span>}</td>
-          {lead && <td><ScopeToggle id={i.id} active={i.active} /></td>}
+          {lead && <td><div className="row-actions"><ScopeEdit item={{ id: i.id, title: i.title, cadence: i.cadence, dueDay: i.dueDay, ownerId: i.ownerId, approvalLevel: i.approvalLevel, priority: i.priority, needsCopy: i.needsCopy, needsProof: i.needsProof }} users={users} /><ScopeToggle id={i.id} active={i.active} /></div></td>}
         </tr>; })}
       </tbody></table>}
     </div>)}</div>

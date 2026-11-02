@@ -1,10 +1,11 @@
+import { guard } from '@/lib/api';
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { requireUser } from '@/lib/auth';
 import { audit } from '@/lib/audit';
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const u = await requireUser();
+  const g = await guard('*'); if (g.error) return g.error;
+  const u = g.user!;
   if (u.role !== 'MD') return NextResponse.json({ error: 'Only Joseph/MD can mark payroll as paid.' }, { status: 403 });
   const { id } = await params;
   const b = await req.json();

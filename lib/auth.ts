@@ -18,15 +18,9 @@ export async function setSession(userId:string){
 }
 export async function clearSession(){(await cookies()).delete('mw_session')}
 export const currentUser = cache(async () => {
-  const token = (await cookies()).get('mw_session')?.value;
-  if (!token) return null;
-  try {
-    const { payload } = await jwtVerify(token, secret);
-    if (!payload.sub) return null;
-    return db.user.findUnique({ where: { id: String(payload.sub) } });
-  } catch {
-    return null;
-  }
+  const token=(await cookies()).get('mw_session')?.value;
+  if(!token)return null;
+  try{const {payload}=await jwtVerify(token,secret);if(!payload.sub)return null;return db.user.findUnique({where:{id:String(payload.sub)}})}catch{return null}
 });
 export function can(role:string, permission:string){const map:Record<string,string[]> = {
   MD: ['*'],

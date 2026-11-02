@@ -67,7 +67,7 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
       </section>
 
       {latestFile && latestFile.mime.startsWith('image/') && <section className="card"><div className="section-head"><div><h3>AI spell and copy check</h3><p className="muted">Reads every word off the design and compares it with the approved copy. It flags; a person decides.</p></div>{aiProofEnabled() && <RunAiCheck taskId={t.id} label={checkIsCurrent ? 'Run again' : 'Run AI check'} />}</div>
-        {!aiProofEnabled() ? <div className="empty-state">AI check isn’t switched on. Gopi needs to add ANTHROPIC_API_KEY to the server settings.</div>
+        {!aiProofEnabled() ? <div className="empty-state">AI check isn’t switched on yet. The MD can ask the developer to turn it on.</div>
           : !checkIsCurrent ? <div className="empty-state">{check && !checkIsCurrent ? 'A new version was uploaded. Run the check again.' : 'Runs automatically on hand-in, or run it now.'}</div>
           : check.status === 'CLEAR' ? <div className="clear-state"><span>✓</span><div><strong>No spelling errors or copy mismatches found</strong><p>Still read it yourself before passing.</p></div></div>
           : check.status === 'ISSUES' ? <div className="issue-list">{issues.map((i, k) => <div className="issue" key={k}><span className="pill red">{i.type}</span><div><b>“{i.found}”</b> → {i.suggestion}{i.note && <small>{i.note}</small>}</div></div>)}{check.acknowledgedById && <p className="muted">Checked and accepted by {nameOf(check.acknowledgedById)}.</p>}</div>

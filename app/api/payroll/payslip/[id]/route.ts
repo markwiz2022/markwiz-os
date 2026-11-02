@@ -1,6 +1,6 @@
+import { guard } from '@/lib/api';
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { requireUser } from '@/lib/auth';
 
 function esc(s: string) { return s.replace(/\\/g, '\\\\').replace(/\(/g, '\\(').replace(/\)/g, '\\)'); }
 function money(n: number) { return `Rs. ${n.toLocaleString('en-IN', { maximumFractionDigits: 2 })}`; }
@@ -25,7 +25,8 @@ function makePdf(lines: string[]) {
 }
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const u = await requireUser();
+  const g = await guard('*'); if (g.error) return g.error;
+  const u = g.user!;
   const { id } = await params;
   const item = await db.payrollItem.findUnique({ where: { id }, include: { user: true, payrollRun: true } });
   if (!item) return NextResponse.json({ error: 'Payslip not found.' }, { status: 404 });

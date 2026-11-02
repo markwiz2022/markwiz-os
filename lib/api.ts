@@ -11,7 +11,7 @@ export function errorResponse(e: unknown) {
   const err = e as { status?: number; message?: string; name?: string };
   if (err && typeof err.status === 'number' && err.message) return NextResponse.json({ error: err.message }, { status: err.status });
   console.error(e);
-  return NextResponse.json({ error: 'Something went wrong. Try again, and tell Gopi if it keeps happening.' }, { status: 500 });
+  return NextResponse.json({ error: 'Something went wrong. Try again, and tell the MD if it keeps happening.' }, { status: 500 });
 }
 
 export function isLead(role: string) { return role === 'MD' || role === 'DMM'; }

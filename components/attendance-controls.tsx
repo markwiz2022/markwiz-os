@@ -6,6 +6,7 @@ export default function AttendanceControls({ active }: { active: boolean }) {
   const r = useRouter();
   const [busy, setBusy] = useState(false);
   const [late, setLate] = useState(false);
+  const [lateMsg, setLateMsg] = useState('');
   const [note, setNote] = useState('');
   const [error, setError] = useState('');
 
@@ -24,7 +25,7 @@ export default function AttendanceControls({ active }: { active: boolean }) {
     const j = await x.json();
     setBusy(false);
     if (!x.ok) { setError(j.error || 'Unable to clock in'); return; }
-    if (j.late) { setLate(true); return; }
+    if (j.late) { setLate(true); setLateMsg(j.message || ''); return; }
     r.refresh();
   }
 
@@ -35,7 +36,7 @@ export default function AttendanceControls({ active }: { active: boolean }) {
     {error && <p className="error">{error}</p>}
     {late && <div className="late-box">
       <b>Late check-in</b>
-      <p>You have passed the 9:00 AM check-in time.</p>
+      <p>{lateMsg || 'You are checking in after the grace time.'}</p>
       <label>Regularisation note<input value={note} onChange={e => setNote(e.target.value)} placeholder="Explain why you are late" /></label>
       <div className="actions">
         <button className="btn" disabled={busy || !note.trim()} onClick={() => call('regularise', { note })}>Regularise</button>

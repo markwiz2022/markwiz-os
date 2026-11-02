@@ -1,11 +1,12 @@
+import { guard } from '@/lib/api';
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { requireUser } from '@/lib/auth';
 import { audit } from '@/lib/audit';
 import { generatePayroll } from '@/lib/payroll';
 
 export async function GET(req: Request) {
-  const u = await requireUser();
+  const g = await guard('*'); if (g.error) return g.error;
+  const u = g.user!;
   const { searchParams } = new URL(req.url);
   const month = searchParams.get('month');
   if (u.role !== 'MD' && u.role !== 'HR') {
@@ -18,7 +19,8 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
-  const u = await requireUser();
+  const g = await guard('*'); if (g.error) return g.error;
+  const u = g.user!;
   if (u.role !== 'MD') return NextResponse.json({ error: 'Only Joseph/MD can generate payroll.' }, { status: 403 });
   const b = await req.json();
   if (!/^\d{4}-\d{2}$/.test(String(b.month || ''))) return NextResponse.json({ error: 'Month must be YYYY-MM.' }, { status: 400 });

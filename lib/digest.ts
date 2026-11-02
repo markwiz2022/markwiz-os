@@ -134,7 +134,7 @@ ${live.map((s) => `<h2 style="font-size:14px;margin:18px 0 8px;color:#b4233a">${
 
 export function emailConfigured() { return !!process.env.SMTP_HOST; }
 
-function transport() {
+export function transport() {
   if (process.env.SMTP_HOST === 'test') return nodemailer.createTransport({ jsonTransport: true });
   const port = Number(process.env.SMTP_PORT || 587);
   return nodemailer.createTransport({

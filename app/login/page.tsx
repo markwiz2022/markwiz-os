@@ -16,7 +16,7 @@ export default function Login(){
       const x=await fetch('/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:email.trim().toLowerCase(),password})});
       const data=await x.json().catch(()=>({}));
       if(x.ok){ r.push(data.redirect || '/'); r.refresh(); }
-      else setErr(data.error==='inactive'?'Your account is inactive. Contact the MD or HR.':'Invalid email or password.');
+      else setErr(data.error==='inactive'?'Your account is inactive. Contact the MD or HR.':data.error==='locked'?`Too many failed attempts. Try again in ${data.minutes||15} minutes, or ask the MD to reset your password.`:'Invalid email or password.');
     }catch{ setErr('Unable to sign in. Please try again.'); }
     finally{ setBusy(false); }
   }
@@ -32,7 +32,7 @@ export default function Login(){
         <button className="btn" disabled={busy}>{busy?'Signing in…':'Sign in'}</button>
         {err&&<p className="error">{err}</p>}
       </form>
-      <div className="muted" style={{marginTop:18,fontSize:12}}>Each employee has an individual account and role-based access.</div>
+      <div className="muted" style={{marginTop:18,fontSize:12}}>Forgot your password? Ask the MD to reset it from My Account. Each employee has an individual account and role-based access.</div>
     </div>
   </div>
 }

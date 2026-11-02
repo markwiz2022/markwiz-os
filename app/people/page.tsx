@@ -4,6 +4,7 @@ import AttendanceControls from '@/components/attendance-controls';
 import LeaveForm from '@/components/leave-form';
 import LeaveActions from '@/components/leave-actions';
 import RegularisationActions from '@/components/regularisation-actions';
+import { GRACE_LABEL, CHECK_IN_LABEL, monthKeyIST } from '@/lib/workcalendar';
 
 export default async function People() {
   const u = await requirePageUser('people');
@@ -39,7 +40,7 @@ export default async function People() {
         <div className="section-head">
           <div>
             <h3>Team status</h3>
-            <p className="muted">Live attendance and leave balance. Check-in is 9:00 AM with grace until 9:15 AM. Working days are Monday to Friday plus the 1st, 3rd and 5th Saturday.</p>
+            <p className="muted">Live attendance and leave balance. Check-in is {CHECK_IN_LABEL} with grace until {GRACE_LABEL}. Working days are Monday to Friday plus the 1st, 3rd and 5th Saturday.</p>
           </div>
         </div>
         <table className="table">
@@ -51,7 +52,7 @@ export default async function People() {
                 <tr key={x.id}>
                   <td><b>{x.name}</b><div className="muted">{x.email}</div></td>
                   <td>{x.role}</td>
-                  <td><span className={`pill ${x.checkInAt && !x.checkOutAt ? 'green' : 'amber'}`}>{x.checkInAt && !x.checkOutAt ? x.status : x.status}</span></td>
+                  <td><span className={`pill ${x.checkInAt && !x.checkOutAt ? 'green' : 'amber'}`}>{x.status}</span></td>
                   <td>{(x.leaveQuota - x.leavesTaken).toFixed(2)} / {x.leaveQuota}</td>
                   <td>{Math.floor(shift / 3600)}h {Math.floor((shift % 3600) / 60)}m</td>
                   <td>{x.id === u.id ? <AttendanceControls active={!!(x.checkInAt && !x.checkOutAt)} /> : <span className="muted">—</span>}</td>
@@ -65,7 +66,7 @@ export default async function People() {
       {(u.role === 'MD' || u.role === 'HR') && (
         <div className="card" style={{ marginTop: 18 }}>
           <h3>Attendance regularisation</h3>
-          <p className="muted">Late check-ins after 9:00 AM appear here. Joseph/MD can approve or reject them.</p>
+          <p className="muted">Check-ins after {GRACE_LABEL} (check-in {CHECK_IN_LABEL} plus grace) appear here. The MD can approve or reject them. Each person can raise two a month.</p>
           <table className="table">
             <thead><tr><th>Employee</th><th>Check-in</th><th>Note</th><th>Status</th><th>Action</th></tr></thead>
             <tbody>
@@ -73,7 +74,7 @@ export default async function People() {
                 <tr><td colSpan={5}>No regularisation requests.</td></tr>
               ) : regularisations.map(x => (
                 <tr key={x.id}>
-                  <td><b>{x.user.name}</b><div className="muted">{x.user.role} · {regularisations.filter(r=>r.userId===x.userId).length}/2 used this month</div></td>
+                  <td><b>{x.user.name}</b><div className="muted">{x.user.role} · {regularisations.filter(r=>r.userId===x.userId&&monthKeyIST(new Date(r.attendanceAt))===monthKeyIST(new Date(x.attendanceAt))).length}/2 used in {monthKeyIST(new Date(x.attendanceAt))}</div></td>
                   <td>{new Date(x.attendanceAt).toLocaleString('en-IN')}</td>
                   <td>{x.note}</td>
                   <td><span className={`pill ${x.status === 'APPROVED' ? 'green' : x.status === 'REJECTED' ? 'red' : 'amber'}`}>{x.status}</span></td>

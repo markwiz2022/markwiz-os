@@ -1,6 +1,6 @@
 import {currentUser} from '@/lib/auth';
 import {db} from '@/lib/db';
-import {getAllClientsHealthBreakdown} from '@/lib/client-health';
+import {getClientHealthBreakdown} from '@/lib/client-health';
 import {redirect} from 'next/navigation';
 import Link from 'next/link';
 import {isOverdue} from '@/lib/task-flow';
@@ -12,22 +12,20 @@ export default async function Home(){
   const now=new Date();
   const hour=Math.floor(istMinutes(now)/60);
   const greeting=hour<12?'Good morning':hour<17?'Good afternoon':'Good evening';
-  const todayKey=istDateKey(now);
-  const [clients,tasks,leads,invoices,users,leave,plans,sayDoPeople,openFlags,confirms]=await Promise.all([
+  // Leads (MD/DMM) see the whole team's work here. Everyone else sees only their own and assigned work,
+  // money figures load only for the MD, and pipeline only for MD and Sales.
+  const lead=u.role==='MD'||u.role==='DMM';
+  const seesSales=['MD','SALES'].includes(u.role);
+  const [clients,tasks,leads,invoices,users,leave]=await Promise.all([
     db.client.findMany({where:{active:true,internal:false},include:{tasks:{select:{status:true}}},orderBy:{healthScore:'asc'}}),
-    db.task.findMany({where:{status:{notIn:['DONE','CLIENT']}},include:{client:true,owner:true},orderBy:{due:'asc'}}),
-    db.lead.findMany({where:{stage:{not:'LOST'}},include:{owner:true}}),
-    db.invoice.findMany({include:{client:true}}),
-    db.user.findMany({where:{active:true}}),
-    db.leaveRequest.count({where:{status:'PENDING'}}),
-    db.dailyPlan.count({where:{dateKey:todayKey,noPlan:false}}),
-    db.kpiTarget.count({where:{metric:'say_do',active:true,user:{active:true}}}),
-    db.performanceFlag.count({where:{status:'OPEN'}}),
-    db.onboardingCheckpoint.count({where:{result:'CONFIRM'}})
+    db.task.findMany({where:{status:{notIn:['DONE','CLIENT']},...(lead?{}:{OR:[{ownerId:u.id},{assignerId:u.id}]})},include:{client:{select:{id:true,name:true,internal:true}},owner:{select:{id:true,name:true}}},orderBy:{due:'asc'}}),
+    seesSales?db.lead.findMany({where:{stage:{not:'LOST'}},select:{stage:true,value:true,probability:true,nextAction:true}}):Promise.resolve([]),
+    u.role==='MD'?db.invoice.findMany({include:{client:{select:{name:true}}}}):Promise.resolve([]),
+    db.user.findMany({where:{active:true},select:{id:true,checkInAt:true,checkOutAt:true}}),
+    u.role==='MD'||u.role==='HR'?db.leaveRequest.count({where:{status:'PENDING'}}):db.leaveRequest.count({where:{status:'PENDING',userId:u.id}})
   ]);
 
-  const healthMap = await getAllClientsHealthBreakdown(db, clients.map(c => c.id), now);
-  const healthClients = clients.map(c => ({ client: c, health: healthMap.get(c.id) ?? { score: 100, health: 'GREEN', issues: [], byOwner: {} } }));
+  const healthClients=await Promise.all(clients.map(async c=>({client:c,health:await getClientHealthBreakdown(db,c.id)})));
   const green=healthClients.filter(x=>x.health.health==='GREEN').length;
   const amber=healthClients.filter(x=>x.health.health==='AMBER').length;
   const red=healthClients.filter(x=>x.health.health==='RED').length;
@@ -39,7 +37,14 @@ export default async function Home(){
   const pipeline=leads.reduce((s,l)=>s+l.value*l.probability/100,0);
   const overdueTasks=tasks.filter(t=>isOverdue(t,now)).length;
   const todayTasks=tasks.filter(t=>istDateKey(t.due)===istDateKey(now)).length;
-  const lateClient=tasks.filter(t=>t.clientFacing&&!t.client.internal&&isOverdue(t,now)).length;
+  const todayKey=istDateKey(now);
+  const [plans,sayDoPeople,openFlags,confirms,lateClient]=await Promise.all([
+    db.dailyPlan.count({where:{dateKey:todayKey,noPlan:false}}),
+    db.kpiTarget.count({where:{metric:'say_do',active:true,user:{active:true}}}),
+    db.performanceFlag.count({where:{status:'OPEN'}}),
+    db.onboardingCheckpoint.count({where:{result:'CONFIRM'}}),
+    Promise.resolve(tasks.filter(t=>t.clientFacing&&!t.client.internal&&isOverdue(t,now)).length),
+  ]);
   const noNextAction=leads.filter(l=>!['WON','LOST'].includes(l.stage)&&!l.nextAction).length;
   const overdueInvoices=invoices.filter(i=>i.amount>i.paid&&new Date(i.dueDate)<now);
   const working=users.filter(x=>x.checkInAt&&!x.checkOutAt).length;
@@ -96,12 +101,12 @@ export default async function Home(){
         <div className="section-head"><div><h3>Needs your attention</h3><p className="muted">A focused queue instead of another dashboard full of noise.</p></div>{u.role==='MD'&&<Link className="secondary btn" href="/ai-coo">AI COO</Link>}</div>
         {attention.length===0?<div className="empty-state">No material operating exceptions detected.</div>:<div>{attention.map((a,i)=><div className="attention-item" key={i}><span className="attention-dot" style={{color:a.tone==='red'?'#ff667d':'#f5bd55',background:a.tone==='red'?'#ff667d':'#f5bd55'}}/><div className="attention-copy"><strong>{a.title}</strong><span>{a.body}</span></div></div>)}</div>}
         <div className="subtle-line"/>
-        <div className="summary-grid compact two"><div><b>{overdueTasks}</b><span>overdue tasks</span></div><div><b>{todayTasks}</b><span>due today</span></div><div><b>{noNextAction}</b><span>sales gaps</span></div><div><b>{leave}</b><span>leave requests</span></div></div>
+        <div className="summary-grid compact two"><div><b>{overdueTasks}</b><span>{lead?'overdue tasks':'my overdue tasks'}</span></div><div><b>{todayTasks}</b><span>due today</span></div>{seesSales?<div><b>{noNextAction}</b><span>sales gaps</span></div>:null}<div><b>{leave}</b><span>{u.role==='MD'||u.role==='HR'?'leave requests':'my pending leave'}</span></div></div>
       </div>
     </div>
 
     <div className="grid3" style={{marginTop:14}}>
-      <div className="card"><div className="section-head"><div><h3>Delivery pulse</h3><p className="muted">Where the team is spending attention.</p></div><span className="score-ring"><b>{Math.max(0,100-Math.min(100,overdueTasks*8))}</b></span></div><div className="summary-grid compact two"><div><b>{tasks.length}</b><span>open work</span></div><div><b>{working}</b><span>working now</span></div><div><b>{users.length}</b><span>active team</span></div><div><b>{overdueTasks}</b><span>at risk</span></div></div></div>
+      <div className="card"><div className="section-head"><div><h3>Delivery pulse</h3><p className="muted">{lead?'Where the team is spending attention.':'Your open work and the team on shift.'}</p></div><span className="score-ring"><b>{Math.max(0,100-Math.min(100,overdueTasks*8))}</b></span></div><div className="summary-grid compact two"><div><b>{tasks.length}</b><span>open work</span></div><div><b>{working}</b><span>working now</span></div><div><b>{users.length}</b><span>active team</span></div><div><b>{overdueTasks}</b><span>at risk</span></div></div></div>
       {['MD','SALES'].includes(u.role)&&<div className="card"><h3>Sales pulse</h3><p className="muted">The next opportunities worth attention.</p><div className="summary-grid compact two" style={{marginTop:14}}><div><b>{leads.length}</b><span>open leads</span></div><div><b>₹{Math.round(pipeline).toLocaleString('en-IN')}</b><span>weighted value</span></div><div><b>{noNextAction}</b><span>missing next step</span></div><div><b>{leads.filter(l=>l.stage==='WON').length}</b><span>won</span></div></div></div>}
       {u.role==='MD'&&<div className="card"><h3>Cash pulse</h3><p className="muted">Money that needs to move.</p><div className="summary-grid compact two" style={{marginTop:14}}><div><b>₹{receivables.toLocaleString('en-IN')}</b><span>receivable</span></div><div><b>₹{collected.toLocaleString('en-IN')}</b><span>collected</span></div><div><b>{overdueInvoices.length}</b><span>overdue</span></div><div><b>₹{overdueAmount.toLocaleString('en-IN')}</b><span>overdue amount</span></div></div></div>}
       {u.role!=='MD'&&<div className="card"><h3>My Pay</h3><p className="muted">Your private salary and payslip history.</p><Link className="secondary btn" href="/my-pay">Open My Pay</Link></div>}

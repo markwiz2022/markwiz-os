@@ -1,5 +1,7 @@
 import type {NextConfig} from 'next';
 const nextConfig:NextConfig={
+  // `npm run check` builds into .next-check so it never disturbs a running `npm run dev`.
+  distDir: process.env.NEXT_DIST_DIR || '.next',
   serverExternalPackages:['nodemailer'],
   webpack(config, {nextRuntime}) {
     // nodemailer (used only from the Node.js-only scheduler) pulls in Node core

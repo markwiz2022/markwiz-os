@@ -79,6 +79,9 @@ model Client {
   internal       Boolean      @default(false)
   scopeItems     ScopeItem[]
   incidents      Incident[]
+  leads          Lead[]
+  contentPosts   ContentPost[]
+  reports        ClientReport[]
 }
 
 model Project {
@@ -144,6 +147,7 @@ model Task {
   files             TaskFile[]
   proofChecks       ProofCheck[]
   incidents         Incident[]
+  contentPosts      ContentPost[]
 
   @@unique([scopeItemId, periodKey])
   @@index([ownerId, status])
@@ -187,6 +191,9 @@ model Lead {
   nextFollowUp DateTime?
   lastContact  DateTime?
   notes        String?
+  lostReason   String?
+  clientId     String?
+  client       Client?        @relation(fields: [clientId], references: [id], onDelete: SetNull)
   createdAt    DateTime       @default(now())
   updatedAt    DateTime       @updatedAt
   owner        User?          @relation("LeadOwner", fields: [ownerId], references: [id])
@@ -678,4 +685,59 @@ model DigestLog {
   emailed   Boolean  @default(false)
   error     String?
   createdAt DateTime @default(now())
+}
+
+// Nov 2026: failed sign-in attempts, used to slow down password guessing.
+// Rows older than a day are removed automatically.
+model LoginAttempt {
+  id        String   @id @default(cuid())
+  key       String
+  success   Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([key, createdAt])
+}
+
+// Nov 2026: settings the MD can change in the app without a code change.
+model AppSetting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+}
+
+// Nov 2026: content calendar. One row per planned post.
+// status: PLANNED → IN_DESIGN → IN_REVIEW → APPROVED → POSTED (or SKIPPED)
+model ContentPost {
+  id          String   @id @default(cuid())
+  clientId    String
+  date        DateTime
+  platform    String   @default("Instagram")
+  format      String   @default("Static post")
+  title       String
+  caption     String?
+  status      String   @default("PLANNED")
+  taskId      String?
+  postedUrl   String?
+  notes       String?
+  createdById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  client      Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  task        Task?    @relation(fields: [taskId], references: [id], onDelete: SetNull)
+
+  @@index([clientId, date])
+}
+
+// Nov 2026: weekly client reports that were emailed (weekKey = Monday, YYYY-MM-DD).
+model ClientReport {
+  id       String   @id @default(cuid())
+  clientId String
+  weekKey  String
+  sentTo   String
+  sentById String?
+  note     String?
+  sentAt   DateTime @default(now())
+  client   Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@index([clientId, weekKey])
 }

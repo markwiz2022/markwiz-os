@@ -1,30 +1,43 @@
 import { requirePageUser } from '@/lib/auth';
 import { db } from '@/lib/db';
-import { getAllClientsHealthBreakdown } from '@/lib/client-health';
+import { getClientHealthBreakdown } from '@/lib/client-health';
 import ClientForm from '@/components/client-form';
+import ClientEdit from '@/components/client-edit';
+import Link from 'next/link';
+import { canCreateClients } from '@/lib/settings';
 
-export default async function Clients() {
+export default async function Clients({ searchParams }: { searchParams: Promise<{ q?: string; health?: string }> }) {
   const u=await requirePageUser('clients');
-  const now = new Date();
+  const sp=await searchParams;
+  const q=(sp.q??'').trim().toLowerCase();
+  const fHealth=['GREEN','AMBER','RED'].includes(sp.health??'')?sp.health!:'';
+  const canAdd=await canCreateClients(u);
 
-  const [cs, healthMap] = await Promise.all([
-    db.client.findMany({
-      where: { internal: false },
-      orderBy: { name: 'asc' },
-      include: {
-        projects: true,
-        tasks: true,
-        invoices: true,
-        meetings: true,
-      },
-    }),
-    getAllClientsHealthBreakdown(db, undefined, now),
-  ]);
+  const cs = await db.client.findMany({
+    where: { internal: false },
+    orderBy: { name: 'asc' },
+    include: {
+      projects: true,
+      tasks: true,
+      invoices: true,
+      meetings: true,
+    },
+  });
 
-  const clients = cs.map((client) => ({
-    ...client,
-    health: healthMap.get(client.id) ?? { score: 100, health: 'GREEN', issues: [], byOwner: {} },
-  }));
+  const allClients = await Promise.all(
+    cs.map(async (client) => {
+      const health = await getClientHealthBreakdown(db, client.id);
+
+      return {
+        ...client,
+        health,
+      };
+    })
+  );
+  const clients = allClients.filter((c) =>
+    (!q || [c.name, c.company, c.industry, c.accountManager].some((v) => v?.toLowerCase().includes(q))) &&
+    (!fHealth || c.health.health === fHealth));
+  const filtered = Boolean(q || fHealth);
 
   return (
     <div className="page">
@@ -38,8 +51,16 @@ export default async function Clients() {
         </div>
       </div>
 
-      {u.role==='MD'&&<ClientForm isMD />}
-      {u.role!=='MD'&&u.email==='aleena@markwiz.com'&&<ClientForm />}
+      {canAdd&&<ClientForm isMD={u.role==='MD'} />}
+
+      <form className="card filter-bar" method="get" action="/clients" style={{ marginBottom: 14 }}>
+        <input name="q" defaultValue={sp.q ?? ''} placeholder="Search client, company, industry or manager" />
+        <select name="health" defaultValue={fHealth}><option value="">Any health</option><option value="RED">Red</option><option value="AMBER">Amber</option><option value="GREEN">Green</option></select>
+        <button className="btn secondary small" type="submit">Filter</button>
+        {filtered && <Link className="btn secondary small" href="/clients">Clear</Link>}
+        <span className="muted">{clients.length} of {allClients.length} clients</span>
+      </form>
+      {clients.length===0&&<div className="card empty-state">{filtered?'No clients match these filters.':'No clients yet.'}</div>}
 
       <div className="grid2">
         {clients.map((c) => {
@@ -71,6 +92,23 @@ export default async function Clients() {
                   {c.health.health} · {c.health.score}
                 </span>
               </div>
+
+              <ClientEdit
+                isMD={u.role==='MD'}
+                client={{
+                  id: c.id,
+                  name: c.name,
+                  company: c.company,
+                  industry: c.industry,
+                  accountManager: c.accountManager,
+                  notes: c.notes,
+                  email: c.email,
+                  phone: c.phone,
+                  website: c.website,
+                  retainer: c.retainer,
+                  renewalDate: c.renewalDate ? new Date(c.renewalDate).toISOString() : null,
+                }}
+              />
 
               {u.role==='MD'&&<div className="muted" style={{ marginBottom: 14 }}>{c.email || 'No email'} · {c.website || 'No website'}</div>}
 
