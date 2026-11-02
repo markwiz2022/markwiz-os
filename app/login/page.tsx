@@ -1,6 +1,7 @@
 'use client';
 import {useState} from 'react';
 import {useRouter} from 'next/navigation';
+import Link from 'next/link';
 
 export default function Login(){
   const [email,setEmail]=useState('');
@@ -32,7 +33,12 @@ export default function Login(){
         <button className="btn" disabled={busy}>{busy?'Signing in…':'Sign in'}</button>
         {err&&<p className="error">{err}</p>}
       </form>
-      <div className="muted" style={{marginTop:18,fontSize:12}}>Forgot your password? Ask the MD to reset it from My Account. Each employee has an individual account and role-based access.</div>
+      <div style={{marginTop: 18, display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11px'}}>
+        <Link href="/forgot-password" style={{color: '#a59bff', textDecoration: 'none', fontWeight: 600}}>
+          Forgot password?
+        </Link>
+        <span className="muted">Role-based access</span>
+      </div>
     </div>
   </div>
 }

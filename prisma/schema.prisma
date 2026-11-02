@@ -741,3 +741,14 @@ model ClientReport {
 
   @@index([clientId, weekKey])
 }
+
+// Password reset tokens for self-serve password recovery via email.
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  email     String
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([email, token])
+}

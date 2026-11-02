@@ -1,10 +1,10 @@
 import './globals.css';
 import type { ReactNode } from 'react';
 import { currentUser } from '@/lib/auth';
-import Link from 'next/link';
 import LogoutButton from '@/components/logout-button';
 import NotificationBell from '@/components/notification-bell';
 import SidebarShell from '@/components/sidebar-shell';
+import NavLink from '@/components/nav-link';
 import type { Metadata, Viewport } from 'next';
 
 export const metadata: Metadata = { title: 'Markwiz OS', description: 'Markwiz operating system', appleWebApp: { capable: true, title: 'Markwiz OS', statusBarStyle: 'black-translucent' } };
@@ -41,14 +41,14 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
               <div className="nav-section">
                 <div className="nav-label">OPERATE</div>
                 <nav>
-                  {u.role === 'MD' && <Link href="/" data-icon="⌂">Command Centre</Link>}
-                  <Link href="/today" data-icon="☀">Today</Link>
-                  <Link href="/tasks" data-icon="✓">Work & Tasks</Link>
-                  <Link href="/clients" data-icon="◉">Clients</Link>
-                  <Link href="/content" data-icon="▦">Content calendar</Link>
-                  {(u.role === 'MD' || u.role === 'DMM') && <Link href="/scopes" data-icon="↻">Client scopes</Link>}
-                  {(u.role === 'MD' || u.role === 'DMM') && <Link href="/reports" data-icon="✉">Client reports</Link>}
-                  {(u.role === 'MD' || u.role === 'DMM') && <Link href="/exceptions" data-icon="!">Exceptions</Link>}
+                  {u.role === 'MD' && <NavLink href="/" data-icon="⌂">Command Centre</NavLink>}
+                  <NavLink href="/today" data-icon="☀">Today</NavLink>
+                  <NavLink href="/tasks" data-icon="✓">Work & Tasks</NavLink>
+                  <NavLink href="/clients" data-icon="◉">Clients</NavLink>
+                  <NavLink href="/content" data-icon="▦">Content calendar</NavLink>
+                  {(u.role === 'MD' || u.role === 'DMM') && <NavLink href="/scopes" data-icon="↻">Client scopes</NavLink>}
+                  {(u.role === 'MD' || u.role === 'DMM') && <NavLink href="/reports" data-icon="✉">Client reports</NavLink>}
+                  {(u.role === 'MD' || u.role === 'DMM') && <NavLink href="/exceptions" data-icon="!">Exceptions</NavLink>}
                 </nav>
               </div>
 
@@ -56,10 +56,10 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
                 <div className="nav-section">
                   <div className="nav-label">GROW</div>
                   <nav>
-                    {['MD', 'SALES'].includes(u.role) && <Link href="/crm" data-icon="↗">Sales CRM</Link>}
-                    {['MD', 'FINANCE'].includes(u.role) && <Link href="/finance" data-icon="₹">Finance</Link>}
-                    {u.role === 'MD' && <Link href="/payroll" data-icon="₹">Payroll</Link>}
-                    {u.role === 'MD' && <Link href="/profitability" data-icon="%">Profitability</Link>}
+                    {['MD', 'SALES'].includes(u.role) && <NavLink href="/crm" data-icon="↗">Sales CRM</NavLink>}
+                    {['MD', 'FINANCE'].includes(u.role) && <NavLink href="/finance" data-icon="₹">Finance</NavLink>}
+                    {u.role === 'MD' && <NavLink href="/payroll" data-icon="₹">Payroll</NavLink>}
+                    {u.role === 'MD' && <NavLink href="/profitability" data-icon="%">Profitability</NavLink>}
                   </nav>
                 </div>
               )}
@@ -67,12 +67,12 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
               <div className="nav-section">
                 <div className="nav-label">PEOPLE</div>
                 <nav>
-                  <Link href="/scorecards" data-icon="◧">Scorecards</Link>
-                  {u.role === 'MD' && <Link href="/team" data-icon="✚">Team & targets</Link>}
-                  <Link href="/people" data-icon="◎">Attendance & Leave</Link>
-                  <Link href="/my-pay" data-icon="₹">My Pay</Link>
-                  <Link href="/account" data-icon="⚙">My Account</Link>
-                  <Link href="/help" data-icon="?">Help & guide</Link>
+                  <NavLink href="/scorecards" data-icon="◧">Scorecards</NavLink>
+                  {u.role === 'MD' && <NavLink href="/team" data-icon="✚">Team & targets</NavLink>}
+                  <NavLink href="/people" data-icon="◎">Attendance & Leave</NavLink>
+                  <NavLink href="/my-pay" data-icon="₹">My Pay</NavLink>
+                  <NavLink href="/account" data-icon="⚙">My Account</NavLink>
+                  <NavLink href="/help" data-icon="?">Help & guide</NavLink>
                 </nav>
               </div>
 
@@ -80,8 +80,8 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
                 <div className="nav-section">
                   <div className="nav-label">INTELLIGENCE</div>
                   <nav>
-                    <Link href="/ai-coo" data-icon="✦">AI COO</Link>
-                    <Link href="/audit" data-icon="≡">Audit Trail</Link>
+                    <NavLink href="/ai-coo" data-icon="✦">AI COO</NavLink>
+                    <NavLink href="/audit" data-icon="≡">Audit Trail</NavLink>
                   </nav>
                 </div>
               )}
