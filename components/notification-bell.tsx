@@ -53,7 +53,7 @@ export default function NotificationBell() {
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
       >
-        Notifications {unreadCount > 0 && <span className="notif-count">{unreadCount}</span>}
+        🔔 Notifications {unreadCount > 0 && <span className="notif-count">{unreadCount}</span>}
       </button>
 
       {open && (

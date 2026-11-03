@@ -30,17 +30,21 @@ export async function POST(req: Request) {
     if (hasOpenShiftToday(u)) {
       return NextResponse.json({ error: 'Already clocked in' }, { status: 409 });
     }
+    const isWfh = b.mode === 'wfh';
     const now = new Date();
     if (isLate(now)) {
       return NextResponse.json({
         late: true,
         checkInAt: now.toISOString(),
-        message: `Check-in time is ${CHECK_IN_LABEL} with grace until ${GRACE_LABEL}. You are checking in late.`,
+        mode: isWfh ? 'wfh' : 'office',
+        message: `Check-in time is ${CHECK_IN_LABEL} with grace until ${GRACE_LABEL}. You are checking in late${isWfh ? ' (WFH)' : ''}.`,
       });
     }
-    await clockIn(u.id, now, 'Active');
-    await audit(u.id, 'CLOCK_IN', 'Attendance', u.id);
-    return NextResponse.json({ ok: true, late: false });
+    const status = isWfh ? 'Active (WFH)' : 'Active';
+    const note = isWfh ? 'Work from Home' : undefined;
+    await clockIn(u.id, now, status, note);
+    await audit(u.id, 'CLOCK_IN', 'Attendance', u.id, { mode: isWfh ? 'WFH' : 'OFFICE' });
+    return NextResponse.json({ ok: true, late: false, mode: isWfh ? 'wfh' : 'office' });
   }
 
   if (b.action === 'regularise') {
@@ -48,6 +52,7 @@ export async function POST(req: Request) {
     if (!note) return NextResponse.json({ error: 'A note is required for regularisation.' }, { status: 400 });
     if (hasOpenShiftToday(u)) return NextResponse.json({ error: 'Already clocked in' }, { status: 409 });
 
+    const isWfh = b.mode === 'wfh';
     const now = new Date();
     if (!isLate(now)) return NextResponse.json({ error: `Regularisation is only required after ${GRACE_LABEL}.` }, { status: 409 });
 
@@ -57,33 +62,37 @@ export async function POST(req: Request) {
     const existing = await db.regularisationRequest.findFirst({ where: { userId: u.id, attendanceAt: { gte: start, lte: end } } });
     if (existing) return NextResponse.json({ error: 'A regularisation request already exists for today.' }, { status: 409 });
 
+    const regulariseNote = isWfh ? `[WFH] ${note}` : note;
     const request = await db.regularisationRequest.create({
-      data: { userId: u.id, attendanceAt: now, note },
+      data: { userId: u.id, attendanceAt: now, note: regulariseNote },
     });
 
-    await clockIn(u.id, now, 'Active - Regularisation Pending', `Regularisation pending: ${note}`);
+    const status = isWfh ? 'Active (WFH) - Regularisation Pending' : 'Active - Regularisation Pending';
+    await clockIn(u.id, now, status, `Regularisation pending: ${regulariseNote}`);
 
     const joseph = await db.user.findFirst({ where: { role: 'MD', active: true }, orderBy: { createdAt: 'asc' } });
     if (joseph) {
       await db.notification.create({
         data: {
           userId: joseph.id,
-          title: 'Attendance regularisation request',
-          body: `${u.name} checked in after ${GRACE_LABEL} and requested regularisation. Note: ${note}`,
+          title: `Attendance regularisation request${isWfh ? ' (WFH)' : ''}`,
+          body: `${u.name} checked in ${isWfh ? '(WFH) ' : ''}after ${GRACE_LABEL} and requested regularisation. Note: ${note}`,
         },
       });
     }
 
-    await audit(u.id, 'REGULARISATION_REQUESTED', 'RegularisationRequest', request.id, { note, attendanceAt: now.toISOString() });
+    await audit(u.id, 'REGULARISATION_REQUESTED', 'RegularisationRequest', request.id, { note: regulariseNote, attendanceAt: now.toISOString(), mode: isWfh ? 'WFH' : 'OFFICE' });
     return NextResponse.json({ ok: true, requestId: request.id, status: 'PENDING' });
   }
 
   if (b.action === 'accept-deduction') {
     if (hasOpenShiftToday(u)) return NextResponse.json({ error: 'Already clocked in' }, { status: 409 });
+    const isWfh = b.mode === 'wfh';
     const now = new Date();
     if (!isLate(now)) return NextResponse.json({ error: `The 0.5 day late deduction option is only required after ${GRACE_LABEL}.` }, { status: 409 });
-    await clockIn(u.id, now, 'Active - 0.5 Day Salary Deduction', 'Late check-in: accepted 0.5 day salary deduction.');
-    await audit(u.id, 'LATE_DEDUCTION', 'Attendance', u.id, { days: DEDUCTION });
+    const status = isWfh ? 'Active (WFH) - 0.5 Day Salary Deduction' : 'Active - 0.5 Day Salary Deduction';
+    await clockIn(u.id, now, status, `${isWfh ? '[WFH] ' : ''}Late check-in: accepted 0.5 day salary deduction.`);
+    await audit(u.id, 'LATE_DEDUCTION', 'Attendance', u.id, { days: DEDUCTION, mode: isWfh ? 'WFH' : 'OFFICE' });
     return NextResponse.json({ ok: true, deducted: DEDUCTION });
   }
 

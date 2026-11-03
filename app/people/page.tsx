@@ -52,10 +52,10 @@ export default async function People() {
                 <tr key={x.id}>
                   <td><b>{x.name}</b><div className="muted">{x.email}</div></td>
                   <td>{x.role}</td>
-                  <td><span className={`pill ${x.checkInAt && !x.checkOutAt ? 'green' : 'amber'}`}>{x.status}</span></td>
+                  <td><span className={`pill ${x.checkInAt && !x.checkOutAt ? (x.status.includes('WFH') ? 'cyan' : 'green') : 'amber'}`}>{x.status.includes('WFH') ? `🏠 ${x.status}` : x.status}</span></td>
                   <td>{(x.leaveQuota - x.leavesTaken).toFixed(2)} / {x.leaveQuota}</td>
                   <td>{Math.floor(shift / 3600)}h {Math.floor((shift % 3600) / 60)}m</td>
-                  <td>{x.id === u.id ? <AttendanceControls active={!!(x.checkInAt && !x.checkOutAt)} /> : <span className="muted">—</span>}</td>
+                  <td>{x.id === u.id ? <AttendanceControls active={!!(x.checkInAt && !x.checkOutAt)} isWfh={x.status.includes('WFH')} /> : <span className="muted">—</span>}</td>
                 </tr>
               );
             })}

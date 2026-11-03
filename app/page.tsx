@@ -21,7 +21,7 @@ export default async function Home(){
     db.task.findMany({where:{status:{notIn:['DONE','CLIENT']},...(lead?{}:{OR:[{ownerId:u.id},{assignerId:u.id}]})},include:{client:{select:{id:true,name:true,internal:true}},owner:{select:{id:true,name:true}}},orderBy:{due:'asc'}}),
     seesSales?db.lead.findMany({where:{stage:{not:'LOST'}},select:{stage:true,value:true,probability:true,nextAction:true}}):Promise.resolve([]),
     u.role==='MD'?db.invoice.findMany({include:{client:{select:{name:true}}}}):Promise.resolve([]),
-    db.user.findMany({where:{active:true},select:{id:true,checkInAt:true,checkOutAt:true}}),
+    db.user.findMany({where:{active:true},select:{id:true,checkInAt:true,checkOutAt:true,status:true}}),
     u.role==='MD'||u.role==='HR'?db.leaveRequest.count({where:{status:'PENDING'}}):db.leaveRequest.count({where:{status:'PENDING',userId:u.id}})
   ]);
 
@@ -47,7 +47,10 @@ export default async function Home(){
   ]);
   const noNextAction=leads.filter(l=>!['WON','LOST'].includes(l.stage)&&!l.nextAction).length;
   const overdueInvoices=invoices.filter(i=>i.amount>i.paid&&new Date(i.dueDate)<now);
-  const working=users.filter(x=>x.checkInAt&&!x.checkOutAt).length;
+  const workingUsers=users.filter(x=>x.checkInAt&&!x.checkOutAt);
+  const working=workingUsers.length;
+  const wfhCount=workingUsers.filter(x=>(x.status||'').includes('WFH')).length;
+  const officeCount=working-wfhCount;
   const attention=[
     ...healthClients.filter(x=>x.health.health==='RED').slice(0,3).map(x=>({tone:'red',title:x.client.name,body:x.health.issues[0]?`${x.health.issues[0].reason}: ${x.health.issues[0].task}`:'Client health is critical.'})),
     ...tasks.filter(t=>isOverdue(t,now)).slice(0,3).map(t=>({tone:'amber',title:t.desc,body:`${t.client.name} · ${t.owner.name} · overdue`})),
@@ -64,7 +67,7 @@ export default async function Home(){
         </div>
         <div className="hero-status">
           <span className="hero-chip">{now.toLocaleDateString('en-IN',{weekday:'long',day:'numeric',month:'short'})}</span>
-          <span className="hero-chip">{users.length} active people</span>
+          <span className="hero-chip">{workingUsers.length} working ({officeCount} office{wfhCount ? ` · ${wfhCount} WFH` : ''})</span>
           <span className="hero-chip">{green} healthy · {amber} watch · {red} critical</span>
         </div>
       </div>
