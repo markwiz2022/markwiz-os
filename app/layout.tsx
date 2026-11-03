@@ -1,41 +1,45 @@
 import './globals.css';
 import type { ReactNode } from 'react';
 import { currentUser } from '@/lib/auth';
+import Link from 'next/link';
 import LogoutButton from '@/components/logout-button';
 import NotificationBell from '@/components/notification-bell';
 import SidebarShell from '@/components/sidebar-shell';
+import ThemeToggle, { THEME_SCRIPT } from '@/components/theme-toggle';
 import NavLink from '@/components/nav-link';
 import type { Metadata, Viewport } from 'next';
 
 export const metadata: Metadata = { title: 'Markwiz OS', description: 'Markwiz operating system', appleWebApp: { capable: true, title: 'Markwiz OS', statusBarStyle: 'black-translucent' } };
-export const viewport: Viewport = { width: 'device-width', initialScale: 1, themeColor: '#060810' };
+export const viewport: Viewport = { width: 'device-width', initialScale: 1, themeColor: '#080f16' };
+
+const greeting = () => { const h = Number(new Intl.DateTimeFormat('en-GB', { hour: 'numeric', hour12: false, timeZone: 'Asia/Kolkata' }).format(new Date())); return h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening'; };
+const todayLabel = () => new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'Asia/Kolkata' });
 
 export default async function RootLayout({ children }: { children: ReactNode }) {
   const u = await currentUser();
 
   return (
-    <html lang="en">
+    <html lang="en" data-theme="dark" suppressHydrationWarning>
+      <head><script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} /></head>
       <body>
         {u ? (
           <SidebarShell>
             <div className="brand-lockup">
               <div className="brand-mark">M</div>
               <div>
-                <div className="brand">MARKWIZ</div>
-                <span>OPERATING SYSTEM</span>
+                <div className="brand">Markwiz OS</div>
+                <span>INTELLIGENCE SUITE</span>
               </div>
             </div>
 
             <div className="user-card">
-              <div className="avatar">{u.name.slice(0, 1).toUpperCase()}</div>
+              <div className="avatar">▦</div>
               <div className="user-copy">
-                <b>{u.name}</b>
-                <span>{u.role}</span>
+                <span>WORKSPACE</span>
+                <b>Markwiz Marketing</b>
               </div>
-              <small>{u.email}</small>
+              <small>{u.role} access · {u.email}</small>
             </div>
-
-            <NotificationBell />
 
             <div className="nav-scroll">
               <div className="nav-section">
@@ -94,7 +98,20 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
           </SidebarShell>
         ) : null}
 
-        <main className={u ? 'app-main' : 'app-main public-main'}>{children}</main>
+        <main className={u ? 'app-main' : 'app-main public-main'}>
+          {u ? <header className="topbar">
+            <div className="topbar-title"><span>{todayLabel()}</span><b>{greeting()}, {u.name.split(' ')[0]}</b></div>
+            <div className="topbar-actions">
+              <ThemeToggle />
+              <NotificationBell />
+              <Link href="/account" className="top-user" title="My account">
+                <span className="avatar">{u.name.slice(0, 1).toUpperCase()}</span>
+                <span className="top-user-copy"><b>{u.name}</b><small>{u.role}</small></span>
+              </Link>
+            </div>
+          </header> : <div className="public-theme"><ThemeToggle /></div>}
+          {children}
+        </main>
       </body>
     </html>
   );

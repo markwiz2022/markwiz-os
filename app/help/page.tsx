@@ -13,6 +13,7 @@ export default async function Help() {
 
     <div className="grid2">
       <section className="card"><h3>Your day</h3><ol className="list">
+        <li><b>Clock in at the office.</b> When you press Clock in, your browser asks for your location once. At Novel Office, Marathahalli it counts as an office day. Anywhere else (or if you don’t share location) it shows <b>Work from home detected</b>; a work-from-home day is paid as a <b>half day</b>.</li>
         <li><b>Clock in</b> on <a className="client-link" href="/today">Today</a> by {CHECK_IN_LABEL}. You have until {GRACE_LABEL}; after that it counts as late unless you add a regularisation note (two a month).</li>
         <li><b>Commit your plan</b> by 9:30 AM: pick only what you will actually hand in today. The plan locks at 11:00 AM and closes itself at 6:00 PM.</li>
         <li><b>Run the timer</b> on the task you’re working on. Logged time is how client costs are measured, so keep it running only while you work on that task.</li>
@@ -28,7 +29,8 @@ export default async function Help() {
       </ol></section>
 
       <section className="card"><h3>Leave and attendance</h3><ul className="list">
-        <li>Request leave on <a className="client-link" href="/people">Attendance & Leave</a> with dates and a reason. Only working days count.</li>
+        <li>Plan leave on <a className="client-link" href="/people">Attendance & Leave</a>: check the team leave calendar, pick your dates and a reason. Only working days count, and you see how many days you’ll have left before you send it.</li>
+        <li>Your leave total, taken, pending and left are shown at the top of the page. You can withdraw a request while it’s still pending.</li>
         <li>Working days are Monday to Friday plus the 1st, 3rd and 5th Saturday.</li>
         <li>A working day with no clock-in and no approved leave is unpaid, so always clock in or apply for leave.</li>
         <li>Your payslips are on <a className="client-link" href="/my-pay">My Pay</a> once the month is marked paid.</li>
@@ -43,6 +45,10 @@ export default async function Help() {
       <section className="card"><h3>Your scorecard</h3><ul className="list">
         <li><a className="client-link" href="/scorecards">Scorecards</a> are calculated from what happens in the app: hand-ins on time, proof-check returns, Say/Do and so on. Nobody rates their own work.</li>
         <li>Green: no reds and at most one amber. Red: two or more red KPIs.</li>
+      </ul></section>
+
+      <section className="card"><h3>Dark or light</h3><ul className="list">
+        <li>Use the <b>Light / Dark</b> button at the top right to switch. Your choice is remembered on that device.</li>
       </ul></section>
 
       <section className="card"><h3>Account and security</h3><ul className="list">

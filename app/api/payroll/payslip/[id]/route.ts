@@ -38,7 +38,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     `Working days: ${item.workingDays}`, `Attendance days: ${item.attendanceDays}`, `Paid leave days: ${item.paidLeaveDays}`,
     `Unpaid days: ${item.unpaidDays}`, `Late punches: ${item.latePunches}`, `Regularisations used: ${item.regularisationsUsed}/2`, '',
     `Gross salary: ${money(item.grossSalary)}`, `Attendance deduction: ${money(item.attendanceDeduction)}`,
-    `Late deduction: ${money(item.lateDeduction)}`, `Other deduction: ${money(item.otherDeduction)}`, `NET SALARY: ${money(item.netSalary)}`,
+    `Late deduction: ${money(item.lateDeduction)}`, `Work from home (${item.wfhDays} day(s) at half pay): ${money(item.wfhDeduction)}`, `Other deduction: ${money(item.otherDeduction)}`, `NET SALARY: ${money(item.netSalary)}`,
     '', `Paid on: ${item.payrollRun.paidAt ? new Date(item.payrollRun.paidAt).toLocaleDateString('en-IN') : '—'}`, 'Status: PAID',
   ];
   const pdf = makePdf(lines);

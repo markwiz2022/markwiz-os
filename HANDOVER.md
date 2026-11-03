@@ -412,3 +412,15 @@ Every contact saved in Apollo (from a search, a list or the Apollo Chrome extens
 - **How often:** about every 10 minutes while anyone has the CRM open, on each Vercel cron run, and on “Sync now”. For a steady 10-minute sync even when nobody is in the app, add a free job at cron-job.org that calls `https://markwiz-os.vercel.app/api/cron` every 10 minutes with the header `Authorization: Bearer <CRON_SECRET>`.
 - **Code:** `lib/apollo.ts` (sync), `lib/apollo-map.ts` (field mapping, tested in `tests/apollo.test.ts`), `app/api/apollo/route.ts`, `components/apollo-panel.tsx`.
 - **Database:** new optional columns on Lead: `apolloId` (unique), `title`, `linkedin`. Run `npm run db:update` locally and the live `db:push` before deploying.
+
+## 16. New design, office check-in and leave planner (3 Nov 2026)
+
+**Design.** Teal-and-coral glass style (from the Stitch design), Geist font, larger text, a top bar with Light/Dark switch, notifications and profile. All colours are tokens at the top of `app/globals.css` (`:root[data-theme="dark"]` and `:root[data-theme="light"]`); change a colour there and both themes follow. The theme is remembered per device (`localStorage` key `mw-theme`). The notification bell now refreshes every minute, on every page change and when the tab is reopened.
+
+**Office check-in.** Clock-in asks the browser for location once. Within the office radius (default 150 m around Novel Office, Novel MSR Building, Marathahalli: 12.9566849, 77.6999716) it is an office day. Anywhere else, or location not shared, shows “Work from home detected”; the person can confirm and clock in as WFH. The MD gets a notification with the month’s WFH count. The MD can change the office point and radius on Attendance & Leave (“Use my current location” while standing in the office gives the most accurate point). Code: `lib/geo.ts` (rules, tested), `lib/office.ts`, `app/api/attendance/route.ts`, `components/attendance-controls.tsx`.
+
+**WFH = half day.** Payroll counts each WFH day (a working day with no office clock-in) at half pay: `wfhDays` and `wfhDeduction` on each payroll item, shown in Payroll, My Pay, the payslip and the CSV. Late-arrival rules apply to office days only. Location only works on https (the live site) or localhost.
+
+**Leave.** Everyone sees total / taken / pending / left, a two-month team leave calendar (names and dates only) and plans leave with a live day count. Pending days are held so nobody can over-book. Staff can withdraw pending requests; the MD/HR can cancel approved leave (days are returned) and edit anyone’s total and taken (e.g. reset taken to 0 each January). The MD and HR get a notification for every request, with the person’s balance.
+
+**Database:** new optional columns: AttendanceLog `workMode`, `lat`, `lng`, `accuracyM`, `distanceM`; PayrollItem `wfhDays`, `wfhDeduction`. Run `npm run db:update` locally and the live `db:push` before deploying.

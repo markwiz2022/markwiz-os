@@ -1,4 +1,5 @@
 import { db } from './db';
+import { splitWorkDays, WFH_DAY_VALUE } from './geo';
 import { countWorkingDays, isLate, istDateKey, isWorkingDay, monthBoundsIST, workingDayKeys } from './workcalendar';
 
 export function getMonthBounds(monthKey: string) { return monthBoundsIST(monthKey); }
@@ -26,6 +27,9 @@ export async function calculatePayrollItem(userId: string, monthKey: string) {
     if (isWorkingDay(log.at)) punchedKeys.add(istDateKey(log.at));
   }
   const attendanceDays = punchedKeys.size;
+  // Work from home: clock-ins outside the office. Each WFH day is paid as a half day.
+  const { wfh: wfhKeys } = splitWorkDays(logs.filter((l) => isWorkingDay(l.at)).map((l) => ({ dayKey: istDateKey(l.at), workMode: l.workMode })));
+  const wfhDays = wfhKeys.size;
 
   // Approved leave, counted only on working days inside this month.
   const leaves = await db.leaveRequest.findMany({
@@ -52,7 +56,8 @@ export async function calculatePayrollItem(userId: string, monthKey: string) {
   const regularisationsUsed = requests.length;
   const pendingRegularisations = requests.filter(r => r.status === 'PENDING').length;
   const regularisedDays = new Set(requests.filter(r => r.status === 'APPROVED').map(r => istDateKey(r.attendanceAt)));
-  const latePunches = logs.filter(log => isLate(log.at) && !regularisedDays.has(istDateKey(log.at))).length;
+  // Late rules apply to office days only: a WFH day is already a half day.
+  const latePunches = logs.filter(log => isLate(log.at) && log.workMode !== 'WFH' && !regularisedDays.has(istDateKey(log.at))).length;
 
   const monthlySalary = Math.max(0, user.monthlySalary || 0);
   const dailySalary = workingDays ? monthlySalary / workingDays : 0;
@@ -64,15 +69,19 @@ export async function calculatePayrollItem(userId: string, monthKey: string) {
     Math.max(0, grossSalary - attendanceDeduction),
     latePunches * dailySalary * 0.5
   );
+  const wfhDeduction = Math.min(
+    Math.max(0, grossSalary - attendanceDeduction - lateDeduction),
+    wfhDays * dailySalary * (1 - WFH_DAY_VALUE)
+  );
 
   // Money is rounded to whole rupees so payroll screens and payslips show clean figures.
   const rupees = (n: number) => Math.round(n);
   return {
     userId, monthKey, monthlySalary, workingDays, attendanceDays, paidLeaveDays,
-    unpaidDays, latePunches, regularisationsUsed, pendingRegularisations,
+    unpaidDays, latePunches, regularisationsUsed, pendingRegularisations, wfhDays, wfhDeduction: rupees(wfhDeduction),
     lateDeduction: rupees(lateDeduction), attendanceDeduction: rupees(attendanceDeduction), otherDeduction: 0,
     grossSalary: rupees(grossSalary),
-    netSalary: Math.max(0, rupees(grossSalary) - rupees(attendanceDeduction) - rupees(lateDeduction)),
+    netSalary: Math.max(0, rupees(grossSalary) - rupees(attendanceDeduction) - rupees(lateDeduction) - rupees(wfhDeduction)),
   };
 }
 
@@ -84,7 +93,7 @@ export async function generatePayroll(monthKey: string) {
   const users = await db.user.findMany({ where: { active: true }, orderBy: { name: 'asc' } });
   const items = await Promise.all(users.map(u => calculatePayrollItem(u.id, monthKey)));
   const totalGross = items.reduce((s, x) => s + x.grossSalary, 0);
-  const totalDeductions = items.reduce((s, x) => s + x.attendanceDeduction + x.lateDeduction + x.otherDeduction, 0);
+  const totalDeductions = items.reduce((s, x) => s + x.attendanceDeduction + x.lateDeduction + x.wfhDeduction + x.otherDeduction, 0);
   const totalNet = items.reduce((s, x) => s + x.netSalary, 0);
   const workingDays = countWorkingDays(start, end);
 

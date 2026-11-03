@@ -21,7 +21,8 @@ async function backup() {
     contentPosts: await prisma.contentPost.findMany(),
     leads: await prisma.lead.findMany(),
     auditLogs: await prisma.auditLog.findMany(),
-    passwordResetTokens: await prisma.passwordResetToken.findMany(),
+    passwordResetTokens: await prisma.passwordResetToken?.findMany().catch(() => []),
+    clientServices: await prisma.clientService?.findMany().catch(() => []),
   };
 
   const filename = path.join(backupDir, `backup_${Date.now()}.json`);

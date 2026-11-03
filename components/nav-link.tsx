@@ -13,6 +13,7 @@ export default function NavLink({ href, className = '', children, ...props }: Co
       href={href}
       prefetch={true}
       className={`${className} ${isActive ? 'active' : ''}`.trim()}
+      aria-current={isActive ? 'page' : undefined}
       {...props}
     >
       {children}

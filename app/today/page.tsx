@@ -28,23 +28,13 @@ export default async function Today() {
   const taskStatus = plan ? await db.task.findMany({ where: { id: { in: plan.items.map((i) => i.taskId).filter((x): x is string => !!x) } }, select: { id: true, status: true } }) : [];
 
   // Team view for the morning stand-up.
-  let team: { id: string; name: string; clockedIn: boolean; isWfh: boolean; items: number; done: number; late: boolean; noPlan: boolean }[] = [];
+  let team: { id: string; name: string; clockedIn: boolean; items: number; done: number; late: boolean; noPlan: boolean }[] = [];
   if (lead) {
-    const people = await db.user.findMany({ where: { active: true, kpiTargets: { some: { metric: 'say_do', active: true } } }, select: { id: true, name: true, role: true, seat: true, status: true }, orderBy: { name: 'asc' } });
+    const people = await db.user.findMany({ where: { active: true, kpiTargets: { some: { metric: 'say_do', active: true } } }, select: { id: true, name: true, role: true, seat: true }, orderBy: { name: 'asc' } });
     for (const p of people.filter((p) => u.role === 'MD' || isDeliveryLane(p))) {
       const pl = await db.dailyPlan.findUnique({ where: { userId_dateKey: { userId: p.id, dateKey: w.dateKey } }, include: { items: true } });
       const prog = pl && !pl.noPlan ? await planProgress(db, pl, now) : [];
-      const hasClockedIn = await clockedInOn(db, p.id, w.dateKey);
-      team.push({
-        id: p.id,
-        name: p.name,
-        clockedIn: hasClockedIn,
-        isWfh: (p.status || '').includes('WFH'),
-        items: pl?.items.length ?? 0,
-        done: prog.filter((x) => x.done).length,
-        late: !!pl?.late,
-        noPlan: !!pl?.noPlan,
-      });
+      team.push({ id: p.id, name: p.name, clockedIn: await clockedInOn(db, p.id, w.dateKey), items: pl?.items.length ?? 0, done: prog.filter((x) => x.done).length, late: !!pl?.late, noPlan: !!pl?.noPlan });
     }
   }
 
@@ -54,16 +44,7 @@ export default async function Today() {
       <div className="big-number"><b>{month.ratio === null ? '—' : `${Math.round(month.ratio)}%`}</b><span>Say/Do this month</span></div></div>
 
     {!w.working ? <div className="card empty-state">Today is a weekly off. No plan needed.</div> : <>
-      {!clockedIn && <div className="card"><div className="section-head"><div><h3>Clock in to plan your day</h3><p className="muted">Check-in is 9:00 AM with grace until 9:15 AM. Choose Office or WFH.</p></div><AttendanceControls active={false} /></div></div>}
-      {clockedIn && <div className="card" style={{ marginBottom: 14, padding: '12px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <span className="muted" style={{ fontSize: '11px' }}>Today:</span>
-          <span className={`pill ${u.status?.includes('WFH') ? 'cyan' : 'green'}`}>
-            {u.status?.includes('WFH') ? '🏠 Work from Home (WFH)' : '🏢 In Office'}
-          </span>
-        </div>
-        <AttendanceControls active={true} isWfh={u.status?.includes('WFH')} />
-      </div>}
+      {!clockedIn && <div className="card"><div className="section-head"><div><h3>Clock in to plan your day</h3><p className="muted">Check-in is 9:00 AM with grace until 9:15 AM. Clock in at the office: anywhere else counts as work from home (a half day).</p></div><AttendanceControls active={false} /></div></div>}
 
       {reasons.length > 0 && <div className="card warn-card"><div className="section-head"><div><h3>Unfinished from your last plan</h3><p className="muted">Give a reason for each before you commit today. Reasons show on your scorecard.</p></div></div>
         <ReasonsForm items={reasons.map((r) => ({ id: r.id, title: r.title, date: shortKeyLabel(r.plan.dateKey) }))} /></div>}
@@ -79,8 +60,8 @@ export default async function Today() {
     </>}
 
     {lead && team.length > 0 && <div className="card" style={{ marginTop: 14 }}><div className="section-head"><div><h3>Team stand-up</h3><p className="muted">Who has committed, and how far they are.</p></div></div>
-      <table className="table"><thead><tr><th>Person</th><th>Clocked in</th><th>Work Mode</th><th>Plan</th><th>Handed in</th></tr></thead><tbody>
-        {team.map((p) => <tr key={p.id}><td><Link href={`/scorecards?user=${p.id}`}><b>{p.name}</b></Link></td><td>{p.clockedIn ? <span className="pill green">Yes</span> : <span className="muted">No</span>}</td><td>{p.clockedIn ? (p.isWfh ? <span className="pill cyan">🏠 WFH</span> : <span className="pill green">🏢 Office</span>) : <span className="muted">—</span>}</td><td>{p.noPlan ? <span className="pill red">No plan</span> : p.items ? <span className={`pill ${p.late ? 'amber' : 'green'}`}>{p.items} task{p.items === 1 ? '' : 's'}{p.late ? ' · late' : ''}</span> : p.clockedIn && !w.open ? <span className="pill red">Missed the cut-off</span> : <span className="muted">Not yet</span>}</td><td>{p.items ? `${p.done} of ${p.items}` : '—'}</td></tr>)}
+      <table className="table"><thead><tr><th>Person</th><th>Clocked in</th><th>Plan</th><th>Handed in</th></tr></thead><tbody>
+        {team.map((p) => <tr key={p.id}><td><Link href={`/scorecards?user=${p.id}`}><b>{p.name}</b></Link></td><td>{p.clockedIn ? 'Yes' : <span className="muted">No</span>}</td><td>{p.noPlan ? <span className="pill red">No plan</span> : p.items ? <span className={`pill ${p.late ? 'amber' : 'green'}`}>{p.items} task{p.items === 1 ? '' : 's'}{p.late ? ' · late' : ''}</span> : p.clockedIn && !w.open ? <span className="pill red">Missed the cut-off</span> : <span className="muted">Not yet</span>}</td><td>{p.items ? `${p.done} of ${p.items}` : '—'}</td></tr>)}
       </tbody></table></div>}
 
     <div className="card" style={{ marginTop: 14 }}><div className="section-head"><div><h3>Recent days</h3><p className="muted">{month.done} of {month.committed} commitments handed in this month{month.noPlanDays ? `, plus ${month.noPlanDays} day${month.noPlanDays === 1 ? '' : 's'} without a plan` : ''}.</p></div></div>

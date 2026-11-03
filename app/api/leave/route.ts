@@ -3,6 +3,7 @@ import {db} from '@/lib/db';
 import {guard} from '@/lib/api';
 import {audit} from '@/lib/audit';
 import {countWorkingDays, istDayBounds} from '@/lib/workcalendar';
+import {fmtDays, leaveBalance} from '@/lib/leave';
 
 export async function GET(){
   const g=await guard('people');if(g.error)return g.error;const u=g.user!;
@@ -29,17 +30,20 @@ export async function POST(req:Request){
   const targetId=u.role==='MD'&&b.userId?b.userId:u.id;
   const target=await db.user.findUnique({where:{id:targetId}});
   if(!target)return NextResponse.json({error:'User not found'},{status:404});
-  if(target.leaveQuota-target.leavesTaken<days)return NextResponse.json({error:`Insufficient leave balance. ${(target.leaveQuota-target.leavesTaken).toFixed(2)} day(s) left, ${days} requested.`},{status:409});
+  const pending=await db.leaveRequest.aggregate({where:{userId:targetId,status:'PENDING'},_sum:{days:true}});
+  const bal=leaveBalance(target,pending._sum.days??0);
+  if(bal.canBook<days)return NextResponse.json({error:`Not enough leave. ${fmtDays(bal.left)} of ${fmtDays(bal.total)} day(s) left${bal.pending?`, ${fmtDays(bal.pending)} already waiting for approval`:''}. This request needs ${fmtDays(days)}.`},{status:409});
 
   const clash=await db.leaveRequest.findFirst({where:{userId:targetId,status:{not:'REJECTED'},startDate:{lte:to},endDate:{gte:from}}});
   if(clash)return NextResponse.json({error:'You already have a leave request covering those dates.'},{status:409});
 
-  const r=await db.leaveRequest.create({data:{userId:targetId,days,startDate:from,endDate:to,reason:b.reason||''}});
+  const r=await db.leaveRequest.create({data:{userId:targetId,days,startDate:from,endDate:to,reason:String(b.reason||'').slice(0,500)}});
 
+  const fmt=(d:Date)=>d.toLocaleDateString('en-IN',{day:'numeric',month:'short',timeZone:'Asia/Kolkata'});
   const approvers=await db.user.findMany({where:{active:true,role:{in:['MD','HR']}}});
   for(const a of approvers){
     if(a.id===u.id)continue;
-    await db.notification.create({data:{userId:a.id,title:'Leave request',body:`${target.name} requested ${days} day(s) leave from ${from.toLocaleDateString('en-IN')} to ${to.toLocaleDateString('en-IN')}.`}});
+    await db.notification.create({data:{userId:a.id,title:`Leave request: ${target.name}`,body:`${target.name} applied for ${fmtDays(days)} day(s), ${fmt(from)}${days>1?` to ${fmt(new Date(to.getTime()-1))}`:''}. Reason: ${r.reason||'—'}. Balance: ${fmtDays(bal.left)} of ${fmtDays(bal.total)} left (${fmtDays(bal.left-days)} if approved). Approve or reject on Attendance & Leave.`}});
   }
 
   await audit(u.id,'CREATE','LeaveRequest',r.id,{targetId,days,from:from.toISOString(),to:to.toISOString()});

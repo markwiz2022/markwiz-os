@@ -261,6 +261,12 @@ model AttendanceLog {
   type   AttendanceType
   at     DateTime       @default(now())
   note   String?
+  // Nov 2026: where the clock-in happened. OFFICE, WFH, or empty for older records (treated as office).
+  workMode  String?
+  lat       Float?
+  lng       Float?
+  accuracyM Int?
+  distanceM Int?
   user   User           @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
@@ -331,6 +337,8 @@ model PayrollItem {
   lateDeduction         Float
   attendanceDeduction   Float
   otherDeduction        Float       @default(0)
+  wfhDays               Float       @default(0)
+  wfhDeduction          Float       @default(0)
   grossSalary           Float
   netSalary             Float
   createdAt             DateTime    @default(now())

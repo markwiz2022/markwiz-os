@@ -15,7 +15,7 @@ export async function GET(req: Request) {
   if (!run) return NextResponse.json({ error: `No payroll calculated for ${month}` }, { status: 404 });
   await audit(u.id, 'EXPORT', 'PayrollRun', run.id, { month });
   return csvResponse(`payroll-${month}-${run.status.toLowerCase()}.csv`, toCsv(
-    ['Employee ID', 'Name', 'Email', 'Role', 'Monthly salary', 'Working days', 'Days punched', 'Paid leave', 'Absent (unpaid)', 'Late punches', 'Attendance deduction', 'Late deduction', 'Other deduction', 'Gross', 'Net pay', 'Status'],
-    run.items.map((i) => [i.user.employeeCode, i.user.name, i.user.email, i.user.role, i.monthlySalary, i.workingDays, i.attendanceDays, i.paidLeaveDays, i.unpaidDays, i.latePunches, i.attendanceDeduction, i.lateDeduction, i.otherDeduction, i.grossSalary, i.netSalary, run.status]),
+    ['Employee ID', 'Name', 'Email', 'Role', 'Monthly salary', 'Working days', 'Days punched', 'Paid leave', 'Absent (unpaid)', 'Late punches', 'Work-from-home days', 'Attendance deduction', 'Late deduction', 'WFH half-day deduction', 'Other deduction', 'Gross', 'Net pay', 'Status'],
+    run.items.map((i) => [i.user.employeeCode, i.user.name, i.user.email, i.user.role, i.monthlySalary, i.workingDays, i.attendanceDays, i.paidLeaveDays, i.unpaidDays, i.latePunches, i.wfhDays, i.attendanceDeduction, i.lateDeduction, i.wfhDeduction, i.otherDeduction, i.grossSalary, i.netSalary, run.status]),
   ));
 }

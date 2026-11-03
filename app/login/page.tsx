@@ -33,8 +33,8 @@ export default function Login(){
         <button className="btn" disabled={busy}>{busy?'Signing in…':'Sign in'}</button>
         {err&&<p className="error">{err}</p>}
       </form>
-      <div style={{marginTop: 18, display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11px'}}>
-        <Link href="/forgot-password" style={{color: '#a59bff', textDecoration: 'none', fontWeight: 600}}>
+      <div style={{marginTop: 18, display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px'}}>
+        <Link href="/forgot-password" style={{color: 'var(--accent-bright)', textDecoration: 'none', fontWeight: 600}}>
           Forgot password?
         </Link>
         <span className="muted">Role-based access</span>
