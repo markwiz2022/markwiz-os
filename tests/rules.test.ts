@@ -131,3 +131,30 @@ test('client report: escapes text and only links http(s) addresses', () => {
   assert.ok(html.includes('Hi &lt;b&gt;team&lt;/b&gt;'));
   assert.equal(weekLabel('2026-11-02'), '2 Nov – 8 Nov 2026');
 });
+
+import { clientRevenueInMonth, monthlyEquivalent, nextDueKey, serviceAmountInMonth } from '../lib/services';
+
+test('one-time work counts once; yearly items only in their renewal month', () => {
+  const site = { billing: 'ONE_TIME', amount: 150000, startDate: '2026-11-10', status: 'ACTIVE' };
+  assert.equal(serviceAmountInMonth(site, '2026-11'), 150000);
+  assert.equal(serviceAmountInMonth(site, '2026-12'), 0, 'not every month');
+  assert.equal(serviceAmountInMonth(site, '2026-10'), 0);
+  const hosting = { billing: 'YEARLY', amount: 12000, startDate: '2026-03-15', status: 'ACTIVE' };
+  assert.equal(serviceAmountInMonth(hosting, '2026-03'), 12000);
+  assert.equal(serviceAmountInMonth(hosting, '2026-11'), 0);
+  assert.equal(serviceAmountInMonth(hosting, '2027-03'), 12000, 'renews next year');
+  const quarterly = { billing: 'QUARTERLY', amount: 30000, startDate: '2026-01-05', status: 'ACTIVE', endDate: '2026-12-31' };
+  assert.deepEqual(['2026-01', '2026-02', '2026-04', '2026-07', '2026-10', '2027-01'].map((m) => serviceAmountInMonth(quarterly, m)), [30000, 0, 30000, 30000, 30000, 0]);
+  assert.equal(serviceAmountInMonth({ ...site, status: 'QUOTED' }, '2026-11'), 0, 'quotes are not revenue');
+  assert.equal(serviceAmountInMonth({ ...site, status: 'CANCELLED' }, '2026-11'), 0);
+});
+
+test('renewal dates and monthly equivalents', () => {
+  const domain = { billing: 'YEARLY', amount: 1200, startDate: '2025-02-28', status: 'ACTIVE' };
+  assert.equal(nextDueKey(domain, '2026-11-03'), '2027-02-28');
+  assert.equal(nextDueKey({ billing: 'MONTHLY', amount: 1, startDate: '2026-01-31', status: 'ACTIVE' }, '2026-02-01'), '2026-02-28', 'short months clamp');
+  assert.equal(nextDueKey({ billing: 'ONE_TIME', amount: 1, startDate: '2026-10-01', status: 'ACTIVE' }, '2026-11-03'), null, 'past one-time');
+  assert.equal(monthlyEquivalent({ billing: 'YEARLY', amount: 12000, startDate: '2026-01-01', status: 'ACTIVE' }), 1000);
+  assert.equal(clientRevenueInMonth({ retainer: 50000, active: true }, [{ billing: 'ONE_TIME', amount: 80000, startDate: '2026-11-02', status: 'ACTIVE' }], '2026-11'), 130000);
+  assert.equal(clientRevenueInMonth({ retainer: 50000, active: true }, [{ billing: 'ONE_TIME', amount: 80000, startDate: '2026-11-02', status: 'ACTIVE' }], '2026-12'), 50000);
+});

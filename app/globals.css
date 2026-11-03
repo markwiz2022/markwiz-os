@@ -290,3 +290,8 @@ hr{border:0;border-top:1px solid var(--line);margin:20px 0}.back{display:inline-
   .app-main,.app-sidebar{zoom:1.15}
   h1{font-size:26px!important;letter-spacing:-1px!important}
 }
+
+/* Apollo */
+.lead-links{display:flex;gap:10px;flex-wrap:wrap;font-size:12px;margin:4px 0}
+.apollo-panel h3 .pill{margin-left:6px;vertical-align:middle}
+

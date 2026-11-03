@@ -57,6 +57,7 @@ export default async function Help() {
         <li><b>Client reports:</b> each Monday, open last week’s report, add a personal line and send, or save as PDF. Nothing is sent automatically.</li>
         <li><b>Exceptions</b> lists only what’s red; the same list is emailed at 7:00 PM when email is set up.</li>
         {u.role === 'MD' && <li><b>Profitability</b> compares each retainer with logged time and client expenses. If time logging is low, costs look lower than they are.</li>}
+        {u.role === 'MD' && <li><b>Apollo:</b> any contact saved in Apollo appears in Sales CRM as a NEW lead (source “Apollo”) with a follow-up for today, usually within 10 minutes. Use “Sync now” on the CRM page to pull straight away.</li>}
         {u.role === 'MD' && <li>A lead marked <b>Won</b> becomes a client automatically. Check its retainer and load its scope.</li>}
         {u.role === 'MD' && <li><b>One-time & yearly work</b> (website builds, branding, hosting, domains, AMC) goes on the client page, not in the retainer. It counts in Finance only in the month it’s billed or renews; the Finance planner shows the next 12 months and upcoming renewals.</li>}
       </ul></section>}

@@ -5,6 +5,7 @@ import { evaluateCheckpoints } from './onboarding';
 import { autoCloseClientWork, runEscalations, takeSnapshots } from './rules';
 import { closeDay } from './saydo';
 import { generateScopeTasks } from './scope';
+import { syncApollo } from './apollo';
 import { addDaysKey, istDateKey, istMinutes, isWorkingDayKey, lastDayOfMonth, monthKeyIST, monthKeyOffset } from './workcalendar';
 
 // Autopilot jobs (all times IST). Each job runs once per period: a JobRun row is the lock and the record.
@@ -19,6 +20,7 @@ import { addDaysKey, istDateKey, istMinutes, isWorkingDayKey, lastDayOfMonth, mo
 //   19:00 working days   digest            the exceptions email
 //   02:00 on the 1st     month-close       freeze last month's scorecards, raise PIP/bonus flags
 //   every 5 minutes      escalations       overdue to owner + DMM, next day to the MD
+//   every 10 minutes     apollo-sync       new Apollo contacts become CRM leads (needs APOLLO_API_KEY)
 
 type Job = { name: string; keys: (now: Date, installKey: string) => string[]; run: (db: Db, now: Date, key: string) => Promise<unknown> };
 
@@ -102,6 +104,9 @@ export async function runDueJobs(db: Db, now = new Date(), opts: { forceEscalati
     try { ran.push({ job: 'escalations', key: '-', result: JSON.stringify(await runEscalations(db, now)) }); }
     catch (e) { console.error('[autopilot] escalations failed:', e); }
   }
+  // Apollo → CRM. Does nothing without APOLLO_API_KEY, and at most once every 10 minutes.
+  try { const r = await syncApollo(db, { now }); if (r) ran.push({ job: 'apollo-sync', key: '-', result: r.error ? `FAILED ${r.error}` : `created ${r.created}, linked ${r.linked}` }); }
+  catch (e) { console.error('[autopilot] apollo sync failed:', e); }
   return ran;
 }
 

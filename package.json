@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "node scripts/db-provider.mjs && prisma generate && next dev",
     "build": "node scripts/db-provider.mjs && prisma generate && next build",
     "start": "next start",
     "typecheck": "node scripts/db-provider.mjs && prisma generate && tsc --noEmit",

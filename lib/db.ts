@@ -9,4 +9,4 @@ export type Db = ReturnType<typeof createClient>;
 
 const globalForPrisma = globalThis as unknown as { prisma?: Db };
 export const db: Db = globalForPrisma.prisma ?? createClient();
-globalForPrisma.prisma = db;
+if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = db;

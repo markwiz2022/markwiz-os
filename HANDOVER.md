@@ -365,3 +365,50 @@ Update an existing install the same way as section 10: copy the files over, `npm
 - **Security updates:** Next.js 15.5.28 (fixes the critical advisory), nodemailer 10, zod, sharp, postcss.
   Remaining advisories are in the Prisma command-line tool and Next's build-time postcss copy; they don't run
   in the live app. Fixing Prisma needs Prisma 7, a breaking upgrade best done separately.
+
+## 14. One-time and periodic work (3 Nov 2026)
+
+Retainers stay on the client record and count every month. Everything else is a **client service**
+(`ClientService`), added on the client page under **One-time & yearly work** (MD and Finance):
+
+| Billing | Counts in Finance and Profitability |
+|---|---|
+| One-time (website build, branding, offline/BTL, video) | Once, in the month of its billing date |
+| Monthly | Every month from the start date until the end date |
+| Quarterly | Every third month from the start date |
+| Yearly (hosting, domain, email, AMC) | Each anniversary month of the start date |
+
+- **Quoted** and **Cancelled** never count. **Stop renewing** sets an end date of today, so past renewals stay
+  in past months. Delete is for mistakes only (MD; kept in the audit trail).
+- **Finance** shows retainers plus work billed in the selected month, a 12-month revenue planner, the items
+  billed this month (so invoices get raised) and renewals due in the next 60 days. **AI COO** lists renewals
+  due in 30 days. **Profitability** uses the same monthly revenue.
+- **CRM** leads have a billing type. A won monthly lead becomes the client's retainer; a won one-time,
+  quarterly or yearly lead becomes a client service with that value.
+- The rules are in `lib/services.ts` and tested in `tests/rules.test.ts`.
+
+**Updating the live app (Vercel + Supabase):** the database needs the new table and column before the new code
+goes live. From the project folder on the Mac:
+
+```bash
+DATABASE_URL="<Supabase pooled URL, port 6543, ending ?pgbouncer=true>" \
+DATABASE_URL_UNPOOLED="<Supabase direct URL, port 5432>" \
+npm run db:push
+```
+
+Then deploy the code the usual way. `npm run dev` switches the project back to the local SQLite database by itself.
+Supabase users: `DATABASE_URL` must be the pooled address with `?pgbouncer=true`; `DATABASE_URL_UNPOOLED` the
+direct (or session pooler) address on port 5432.
+
+## 15. Apollo → Sales CRM (3 Nov 2026)
+
+Every contact saved in Apollo (from a search, a list or the Apollo Chrome extension) becomes a NEW lead in Sales CRM.
+
+- **Turn it on:** Apollo → Settings → Integrations → API Keys → create a key. In Vercel → Settings → Environment Variables add `APOLLO_API_KEY` with that key, then redeploy. On your Mac, put it in `.env`.
+- **What comes across:** name, job title, company, email, phone, website, industry, LinkedIn. Source is “Apollo”, stage NEW, probability 10%, next action “First touch: reach out”, follow-up today. Each card links back to the contact in Apollo.
+- **No duplicates:** matched by Apollo contact id, then by email. A lead you already added by hand is linked to Apollo, not copied.
+- **First sync** brings in contacts saved in the last 7 days only, not your whole Apollo history.
+- **Who gets them:** the MD picks a person on the CRM page (“Leads go to”). Default is the first Sales person. They get a notification.
+- **How often:** about every 10 minutes while anyone has the CRM open, on each Vercel cron run, and on “Sync now”. For a steady 10-minute sync even when nobody is in the app, add a free job at cron-job.org that calls `https://markwiz-os.vercel.app/api/cron` every 10 minutes with the header `Authorization: Bearer <CRON_SECRET>`.
+- **Code:** `lib/apollo.ts` (sync), `lib/apollo-map.ts` (field mapping, tested in `tests/apollo.test.ts`), `app/api/apollo/route.ts`, `components/apollo-panel.tsx`.
+- **Database:** new optional columns on Lead: `apolloId` (unique), `title`, `linkedin`. Run `npm run db:update` locally and the live `db:push` before deploying.

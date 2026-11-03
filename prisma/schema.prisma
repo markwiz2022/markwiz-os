@@ -194,6 +194,10 @@ model Lead {
   notes        String?
   lostReason   String?
   billing      String         @default("MONTHLY")
+  // Nov 2026: leads pulled from Apollo. apolloId stops the same contact being imported twice.
+  apolloId     String?        @unique
+  title        String?
+  linkedin     String?
   clientId     String?
   client       Client?        @relation(fields: [clientId], references: [id], onDelete: SetNull)
   createdAt    DateTime       @default(now())
