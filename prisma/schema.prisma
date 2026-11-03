@@ -82,6 +82,7 @@ model Client {
   leads          Lead[]
   contentPosts   ContentPost[]
   reports        ClientReport[]
+  services       ClientService[]
 }
 
 model Project {
@@ -192,6 +193,7 @@ model Lead {
   lastContact  DateTime?
   notes        String?
   lostReason   String?
+  billing      String         @default("MONTHLY")
   clientId     String?
   client       Client?        @relation(fields: [clientId], references: [id], onDelete: SetNull)
   createdAt    DateTime       @default(now())
@@ -751,4 +753,25 @@ model PasswordResetToken {
   createdAt DateTime @default(now())
 
   @@index([email, token])
+}
+
+// Nov 2026: work billed outside the monthly retainer.
+// billing: ONE_TIME (counts once, in the month of startDate), MONTHLY, QUARTERLY, YEARLY (from startDate, until endDate).
+// status: QUOTED and CANCELLED never count as revenue.
+model ClientService {
+  id        String    @id @default(cuid())
+  clientId  String
+  name      String
+  category  String    @default("Other")
+  billing   String    @default("ONE_TIME")
+  amount    Float
+  startDate DateTime
+  endDate   DateTime?
+  status    String    @default("ACTIVE")
+  notes     String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  client    Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@index([clientId])
 }

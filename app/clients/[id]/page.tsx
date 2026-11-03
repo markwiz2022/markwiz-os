@@ -6,6 +6,10 @@ import { getClientHealthBreakdown } from '@/lib/client-health';
 import ProjectForm from '@/components/project-form';
 import ClientEdit from '@/components/client-edit';
 import ClientDangerZone from '@/components/client-delete';
+import { ServicesPanel } from '@/components/client-services';
+import { can } from '@/lib/auth';
+import { clientRevenueInMonth, isBilling, isServiceStatus, nextDueKey, dayKey } from '@/lib/services';
+import { istDateKey, monthKeyIST, monthKeyOffset } from '@/lib/workcalendar';
 import { IncidentForm } from '@/components/ops';
 import { INCIDENT_LABEL } from '@/lib/client-health';
 import { describeCadence } from '@/lib/scope';
@@ -26,6 +30,7 @@ export default async function ClientDetail({params}:{params:Promise<{id:string}>
     meetings:{orderBy:{date:'desc'}},
     scopeItems:{where:{active:true},orderBy:{createdAt:'asc'}},
     incidents:{orderBy:{createdAt:'desc'},take:10},
+    services:{orderBy:{startDate:'desc'}},
   }});
   if(!c)notFound();
 
@@ -100,6 +105,8 @@ export default async function ClientDetail({params}:{params:Promise<{id:string}>
       <section className="card"><div className="panel-heading"><div><div className="eyebrow">SCOPE</div><h2>Recurring deliverables</h2></div><Link className="count-chip" href="/scopes">{c.scopeItems.length} active</Link></div>{c.scopeItems.length===0?<div className="empty-state">No scope loaded. {lead?'Add it on Client scopes so the work creates itself.':''}</div>:<div className="detail-list">{c.scopeItems.map(i=><div key={i.id}><span>{i.title}</span><b>{describeCadence(i)}</b></div>)}</div>}</section>
       <section className="card"><div className="panel-heading"><div><div className="eyebrow">QUALITY</div><h2>Errors and complaints</h2></div></div>{c.incidents.length===0?<div className="empty-state">Nothing logged.</div>:<div className="priority-list">{c.incidents.map(i=><div className="priority" key={i.id}><span className="pill red">{INCIDENT_LABEL[i.type]??i.type}</span><div>{i.description}<div className="muted">{date(i.createdAt)}</div></div></div>)}</div>}{lead&&!c.internal&&<div style={{marginTop:12}}><IncidentForm clientId={c.id} types={[{key:'COMPLAINT',label:'Client complaint'},{key:'ERROR',label:'Error reached the client'}]}/></div>}</section>
     </div>
+
+    {can(u.role,'finance')&&(()=>{const todayKey=istDateKey(new Date());const thisMonth=monthKeyIST(new Date());const svc=c.services.map(s=>({id:s.id,name:s.name,category:s.category,billing:isBilling(s.billing)?s.billing:'ONE_TIME' as const,amount:s.amount,startDate:dayKey(s.startDate),endDate:s.endDate?dayKey(s.endDate):null,status:isServiceStatus(s.status)?s.status:'ACTIVE' as const,notes:s.notes,nextDue:null as string|null}));for(const s of svc)s.nextDue=nextDueKey(s,todayKey);const next12=Array.from({length:12},(_,i)=>monthKeyOffset(thisMonth,i)).reduce((sum,m)=>sum+clientRevenueInMonth({retainer:0,active:true},svc,m),0);const thisMonthOther=clientRevenueInMonth({retainer:0,active:true},svc,thisMonth);return <section className="card" style={{marginTop:12}}><div className="panel-heading"><div><div className="eyebrow">BILLING BEYOND THE RETAINER</div><h2>One-time & yearly work</h2><p className="muted">Website builds, branding, offline campaigns, hosting, domains, email, AMC. Each counts in Finance only in the month it’s billed or renews.</p></div><div className="hero-status"><span className="pill">This month ₹{Math.round(thisMonthOther).toLocaleString('en-IN')}</span><span className="pill">Next 12 months ₹{Math.round(next12).toLocaleString('en-IN')}</span></div></div><ServicesPanel clientId={c.id} services={svc} canDelete={u.role==='MD'} /></section>})()}
 
     {u.role==='MD'&&<div className="client-secondary-grid bottom-grid">
       <section className="card"><div className="panel-heading"><div><div className="eyebrow">BILLING</div><h2>Invoices</h2></div></div>{c.invoices.length===0?<div className="empty-state">No invoices recorded.</div>:<div className="invoice-list">{c.invoices.map(i=><div className="invoice-row" key={i.id}><div><strong>{i.number}</strong><span>Due {date(i.dueDate)}</span></div><div><b>{money(i.amount)}</b><span>{money(i.paid)} paid</span></div><span className="pill">{i.status}</span></div>)}</div>}</section>

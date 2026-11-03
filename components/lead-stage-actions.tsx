@@ -48,12 +48,12 @@ export function LeadClientLink({ id, clientId, clientName }: { id: string; clien
 }
 
 /** Edit the details sales update most: value, probability, source, next action and follow-up. */
-export function LeadEdit({ lead }: { lead: { id: string; name: string; company: string | null; value: number; probability: number; source: string | null; nextAction: string | null; nextFollowUp: string | null; email: string | null; phone: string | null; notes: string | null } }) {
+export function LeadEdit({ lead }: { lead: { id: string; name: string; company: string | null; value: number; probability: number; source: string | null; nextAction: string | null; nextFollowUp: string | null; billing: string; email: string | null; phone: string | null; notes: string | null } }) {
   const r = useRouter();
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const blank = () => ({ company: lead.company ?? '', value: String(lead.value), probability: String(lead.probability), source: lead.source ?? '', nextAction: lead.nextAction ?? '', nextFollowUp: lead.nextFollowUp ?? '', email: lead.email ?? '', phone: lead.phone ?? '', notes: lead.notes ?? '' });
+  const blank = () => ({ company: lead.company ?? '', value: String(lead.value), billing: lead.billing || 'MONTHLY', probability: String(lead.probability), source: lead.source ?? '', nextAction: lead.nextAction ?? '', nextFollowUp: lead.nextFollowUp ?? '', email: lead.email ?? '', phone: lead.phone ?? '', notes: lead.notes ?? '' });
   const [f, setF] = useState(blank);
   const sources: string[] = [...LEAD_SOURCES];
   if (f.source && !sources.includes(f.source)) sources.push(f.source);
@@ -67,7 +67,8 @@ export function LeadEdit({ lead }: { lead: { id: string; name: string; company: 
   if (!open) return <button type="button" className="btn secondary small" onClick={() => { setF(blank()); setOpen(true); }}>Edit lead</button>;
   return <form className="inline-edit" onSubmit={save}>
     <input value={f.company} onChange={(e) => setF({ ...f, company: e.target.value })} placeholder="Company" />
-    <input value={f.value} onChange={(e) => setF({ ...f, value: e.target.value })} type="number" min="0" placeholder="Monthly value" />
+    <select value={f.billing} onChange={(e) => setF({ ...f, billing: e.target.value })}><option value="MONTHLY">Monthly retainer</option><option value="ONE_TIME">One-time project</option><option value="QUARTERLY">Quarterly</option><option value="YEARLY">Yearly</option></select>
+    <input value={f.value} onChange={(e) => setF({ ...f, value: e.target.value })} type="number" min="0" placeholder={f.billing === 'MONTHLY' ? 'Monthly value' : f.billing === 'ONE_TIME' ? 'Project value' : 'Value per period'} />
     <input value={f.probability} onChange={(e) => setF({ ...f, probability: e.target.value })} type="number" min="0" max="100" placeholder="Probability %" />
     <select value={f.source} onChange={(e) => setF({ ...f, source: e.target.value })}><option value="">Source not set</option>{sources.map((s) => <option key={s}>{s}</option>)}</select>
     <input value={f.nextAction} onChange={(e) => setF({ ...f, nextAction: e.target.value })} placeholder="Next action" />

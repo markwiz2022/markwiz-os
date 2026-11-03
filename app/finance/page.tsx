@@ -4,7 +4,8 @@ import { db } from '@/lib/db';
 import { InvoiceForm, ExpenseForm, PaymentForm } from '@/components/finance-forms';
 import { ExpenseRowActions, InvoiceRowActions } from '@/components/finance-row-actions';
 import { istDay, parseMonthKey } from '@/lib/csv';
-import { monthBoundsIST, monthKeyIST, monthKeyOffset, monthLabel } from '@/lib/workcalendar';
+import { istDateKey, monthBoundsIST, monthKeyIST, monthKeyOffset, monthLabel } from '@/lib/workcalendar';
+import { BILLING_LABEL, isBilling, nextDueKey, serviceAmountInMonth } from '@/lib/services';
 
 export default async function Finance({ searchParams }: { searchParams: Promise<{ month?: string }> }) {
   const u = await requirePageUser('finance');
@@ -15,20 +16,36 @@ export default async function Finance({ searchParams }: { searchParams: Promise<
   const month = parseMonthKey(sp.month) && sp.month! <= currentMonth ? sp.month! : currentMonth;
   const { start, end } = monthBoundsIST(month);
 
-  const [invoices, monthExpenses, clients, monthPayroll] = await Promise.all([
+  const [invoices, monthExpenses, clients, monthPayroll, services] = await Promise.all([
     db.invoice.findMany({ include: { client: { select: { id: true, name: true } } }, orderBy: { dueDate: 'asc' } }),
     db.expense.findMany({ where: { date: { gte: start, lte: end } }, include: { client: { select: { id: true, name: true } } }, orderBy: { date: 'desc' } }),
     db.client.findMany({ where: { active: true, internal: false }, orderBy: { name: 'asc' } }),
     db.payrollRun.findMany({ where: { status: 'PAID', monthKey: month } }),
+    db.clientService.findMany({ where: { status: { in: ['ACTIVE', 'COMPLETED'] }, client: { internal: false } }, include: { client: { select: { id: true, name: true, active: true } } }, orderBy: { startDate: 'asc' } }),
   ]);
   const clientOpts = clients.map((c) => ({ id: c.id, name: c.name }));
 
   // Money in for the month: active monthly retainers. Money out for the same month:
   // expenses dated in the month plus that month's paid payroll. Same period on both sides.
   const retainers = clients.reduce((s, c) => s + c.retainer, 0);
+  // One-time and periodic work counts only in the month it is billed or renews (lib/services.ts).
+  const billedThisMonth = services.map((s) => ({ s, amount: serviceAmountInMonth(s, month) })).filter((x) => x.amount > 0);
+  const otherWork = billedThisMonth.reduce((sum, x) => sum + x.amount, 0);
+  const revenue = retainers + otherWork;
   const expenseTotal = monthExpenses.reduce((s, e) => s + e.amount, 0);
   const payrollTotal = monthPayroll.reduce((s, r) => s + r.totalNet, 0);
-  const contribution = retainers - expenseTotal - payrollTotal;
+  const contribution = revenue - expenseTotal - payrollTotal;
+
+  // 12-month planner from the current month, assuming today's retainers continue.
+  const planner = Array.from({ length: 12 }, (_, i) => monthKeyOffset(currentMonth, i)).map((m) => {
+    const items = services.map((s) => serviceAmountInMonth(s, m)).filter((a) => a > 0);
+    const other = items.reduce((a, b) => a + b, 0);
+    return { m, retainers, other, items: items.length, total: retainers + other };
+  });
+  const todayKey = istDateKey(now);
+  const in60 = istDateKey(new Date(now.getTime() + 60 * 86400000));
+  const renewals = services.filter((s) => s.billing !== 'ONE_TIME' && s.client.active).map((s) => ({ s, due: nextDueKey(s, todayKey) })).filter((x): x is { s: typeof x.s; due: string } => !!x.due && x.due <= in60).sort((a, b) => a.due.localeCompare(b.due));
+  const dayLabel = (k: string) => new Date(`${k}T12:00:00Z`).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', timeZone: 'UTC' });
 
   // Invoices are tracked to date, not by month.
   const billed = invoices.reduce((s, i) => s + i.amount, 0);
@@ -63,9 +80,10 @@ export default async function Finance({ searchParams }: { searchParams: Promise<
       <div className="mini-heading">{monthLabel(month).toUpperCase()}</div>
       <div className="grid">
         <K t="Monthly retainers" v={retainers} note={`${clients.length} active clients`} />
+        <K t="One-time & yearly work" v={otherWork} note={`${billedThisMonth.length} item${billedThisMonth.length === 1 ? '' : 's'} billed this month`} />
         <K t="Expenses" v={expenseTotal} note={`${monthExpenses.length} recorded`} />
         <K t="Payroll paid" v={payrollTotal} note={monthPayroll.length ? 'Marked paid' : 'Not paid yet'} />
-        <K t="Contribution" v={contribution} note="Retainers less expenses and payroll" bad={contribution < 0} />
+        <K t="Contribution" v={contribution} note={`Revenue ₹${Math.round(revenue).toLocaleString('en-IN')} less expenses and payroll`} bad={contribution < 0} />
       </div>
 
       <div className="mini-heading" style={{ marginTop: 18 }}>INVOICES TO DATE</div>
@@ -74,6 +92,22 @@ export default async function Finance({ searchParams }: { searchParams: Promise<
         <K t="Collected" v={collected} />
         <K t="Receivables" v={receivables} />
         <K t="Overdue" v={overdueAmount} note={`${overdue.length} invoice${overdue.length === 1 ? '' : 's'}`} bad={overdue.length > 0} />
+      </div>
+
+      <div className="grid2" style={{ marginTop: 18 }}>
+        <div className="card">
+          <div className="section-head"><div><h3>Revenue planner · next 12 months</h3><p className="muted">Retainers every month (assuming current clients continue) plus one-time and yearly work only in the month it’s billed or renews. Add that work on each client’s page.</p></div></div>
+          <div className="table-wrap"><table className="table planner"><thead><tr><th>Month</th><th className="num">Retainers</th><th className="num">One-time & yearly</th><th className="num">Expected total</th></tr></thead><tbody>
+            {planner.map((p) => <tr key={p.m} className={p.m === month ? 'current' : ''}><td><Link className="client-link" href={`/finance?month=${p.m}`}>{monthLabel(p.m)}</Link></td><td className="num">₹{Math.round(p.retainers).toLocaleString('en-IN')}</td><td className="num">{p.other ? `₹${Math.round(p.other).toLocaleString('en-IN')} (${p.items})` : '—'}</td><td className="num"><b>₹{Math.round(p.total).toLocaleString('en-IN')}</b></td></tr>)}
+            <tr><td><b>12-month total</b></td><td className="num">₹{Math.round(planner.reduce((s, p) => s + p.retainers, 0)).toLocaleString('en-IN')}</td><td className="num">₹{Math.round(planner.reduce((s, p) => s + p.other, 0)).toLocaleString('en-IN')}</td><td className="num"><b>₹{Math.round(planner.reduce((s, p) => s + p.total, 0)).toLocaleString('en-IN')}</b></td></tr>
+          </tbody></table></div>
+        </div>
+        <div className="card">
+          <div className="section-head"><div><h3>Billed beyond retainers · {monthLabel(month)}</h3><p className="muted">One-time and periodic work counted in this month. Remember to raise the invoice.</p></div></div>
+          {billedThisMonth.length === 0 ? <div className="empty-state">Nothing beyond retainers this month.</div> : <div className="detail-list">{billedThisMonth.map(({ s, amount }) => <div key={s.id}><span><Link className="client-link" href={`/clients/${s.client.id}`}>{s.client.name}</Link> · {s.name}<br /><small>{isBilling(s.billing) ? BILLING_LABEL[s.billing] : s.billing}</small></span><b>₹{Math.round(amount).toLocaleString('en-IN')}</b></div>)}</div>}
+          <div className="section-head" style={{ marginTop: 16 }}><div><h3>Renewals due in the next 60 days</h3><p className="muted">Hosting, domains, email, AMC and other yearly or quarterly items. Invoice before they lapse.</p></div></div>
+          {renewals.length === 0 ? <div className="empty-state">No renewals due in the next 60 days.</div> : <div className="detail-list">{renewals.map(({ s, due }) => <div key={s.id}><span><Link className="client-link" href={`/clients/${s.client.id}`}>{s.client.name}</Link> · {s.name}<br /><small>{dayLabel(due)}{due < todayKey ? ' · overdue' : ''}</small></span><b>₹{Math.round(s.amount).toLocaleString('en-IN')}</b></div>)}</div>}
+        </div>
       </div>
 
       <div className="grid3" style={{ marginTop: 18 }}>

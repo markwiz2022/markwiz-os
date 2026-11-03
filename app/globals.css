@@ -220,6 +220,17 @@ hr{border:0;border-top:1px solid var(--line);margin:20px 0}.back{display:inline-
 .list{margin:10px 0 0;padding-left:18px;display:grid;gap:8px;font-size:10.5px;line-height:1.55;color:#d4d9e2}
 .help-page .card h3{margin-bottom:4px}
 
+.danger-zone{border-color:rgba(255,102,125,.25);background:rgba(255,102,125,.04)}
+.danger-delete{display:grid;gap:7px;margin-top:10px;padding-top:10px;border-top:1px solid rgba(255,102,125,.18)}
+
+.service-row{display:grid;grid-template-columns:1fr auto;gap:6px 10px;align-items:start;padding:11px 0;border-bottom:1px solid var(--line)}
+.service-row:last-of-type{border-bottom:0}
+.service-row.done{opacity:.6}
+.service-row .row-actions,.service-row .inline-edit,.service-row .error{grid-column:1/-1}
+.service-main{display:grid;gap:3px;font-size:10.5px;min-width:0}
+.planner td.num,.planner th.num{text-align:right;white-space:nowrap}
+.planner tr.current td{background:rgba(139,124,255,.06)}
+
 /* Nov 2026: client reports */
 .report-toolbar{margin-bottom:14px}
 .report-paper{background:#fff;border-radius:16px;overflow:hidden;max-width:700px;margin:0 auto;box-shadow:0 20px 60px rgba(0,0,0,.35)}

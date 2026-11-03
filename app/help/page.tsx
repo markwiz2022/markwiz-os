@@ -58,6 +58,7 @@ export default async function Help() {
         <li><b>Exceptions</b> lists only what’s red; the same list is emailed at 7:00 PM when email is set up.</li>
         {u.role === 'MD' && <li><b>Profitability</b> compares each retainer with logged time and client expenses. If time logging is low, costs look lower than they are.</li>}
         {u.role === 'MD' && <li>A lead marked <b>Won</b> becomes a client automatically. Check its retainer and load its scope.</li>}
+        {u.role === 'MD' && <li><b>One-time & yearly work</b> (website builds, branding, hosting, domains, AMC) goes on the client page, not in the retainer. It counts in Finance only in the month it’s billed or renews; the Finance planner shows the next 12 months and upcoming renewals.</li>}
       </ul></section>}
     </div>
   </div>;

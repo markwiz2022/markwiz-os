@@ -33,6 +33,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   }
   for (const k of ['nextAction', 'source', 'company', 'email', 'phone', 'website', 'industry', 'notes']) if (b[k] !== undefined) data[k] = b[k] === '' ? null : b[k];
   if (b.value !== undefined) { const v = Number(b.value); if (!Number.isFinite(v) || v < 0) return NextResponse.json({ error: 'Value must be zero or more' }, { status: 400 }); data.value = v; }
+  if (b.billing !== undefined) { if (!['MONTHLY', 'ONE_TIME', 'QUARTERLY', 'YEARLY'].includes(String(b.billing))) return NextResponse.json({ error: 'Invalid billing' }, { status: 400 }); data.billing = b.billing; }
   if (b.probability !== undefined) data.probability = Math.max(0, Math.min(100, Number(b.probability)));
   if (b.nextFollowUp !== undefined) data.nextFollowUp = b.nextFollowUp ? new Date(b.nextFollowUp) : null;
   if (b.lastContact) data.lastContact = new Date(b.lastContact);

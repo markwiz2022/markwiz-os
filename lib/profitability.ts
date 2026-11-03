@@ -1,5 +1,6 @@
 import type { Db } from './db';
 import { countWorkingDays, monthBoundsIST } from './workcalendar';
+import { clientRevenueInMonth } from './services';
 
 /** Hours in a working day, used to turn a monthly salary into an hourly cost. Change here if your day is longer. */
 export const HOURS_PER_DAY = 8;
@@ -67,13 +68,14 @@ export async function loadProfitability(db: Db, monthKey: string, now = new Date
   const { start, end } = monthBoundsIST(monthKey);
   const soFarEnd = now < end ? now : end;
   const [clients, people, entries, expenses] = await Promise.all([
-    db.client.findMany({ where: { OR: [{ active: true }, { tasks: { some: { timeEntries: { some: { startedAt: { gte: start, lte: end } } } } } }] }, select: { id: true, name: true, retainer: true, internal: true, active: true } }),
+    db.client.findMany({ where: { OR: [{ active: true }, { tasks: { some: { timeEntries: { some: { startedAt: { gte: start, lte: end } } } } } }] }, select: { id: true, name: true, retainer: true, internal: true, active: true, services: { where: { status: { in: ['ACTIVE', 'COMPLETED'] } }, select: { billing: true, amount: true, startDate: true, endDate: true, status: true } } } }),
     db.user.findMany({ where: { active: true }, omit: { monthlySalary: false } }).then((us) => us.map((x) => ({ id: x.id, name: x.name, monthlySalary: x.monthlySalary }))),
     db.timeEntry.findMany({ where: { startedAt: { gte: start, lte: end }, taskId: { not: null } }, select: { userId: true, seconds: true, task: { select: { clientId: true } } } }),
     db.expense.findMany({ where: { date: { gte: start, lte: end }, clientId: { not: null } }, select: { clientId: true, amount: true } }),
   ]);
   return computeProfitability({
-    clients: clients.map((c) => ({ id: c.id, name: c.name, retainer: c.active ? c.retainer : 0, internal: c.internal })),
+    // Revenue for the month: the retainer plus one-time / periodic work billed in this month.
+    clients: clients.map((c) => ({ id: c.id, name: c.name, retainer: clientRevenueInMonth(c, c.services, monthKey), internal: c.internal })),
     people,
     entries: entries.filter((e) => e.task).map((e) => ({ userId: e.userId, clientId: e.task!.clientId, seconds: e.seconds })),
     expenses,

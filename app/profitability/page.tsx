@@ -26,7 +26,7 @@ export default async function Profitability({ searchParams }: { searchParams: Pr
     <div className="header"><div>
       <div className="eyebrow">MD · PROFITABILITY · {monthLabel(month).toUpperCase()}</div>
       <h1>Client profitability</h1>
-      <p className="muted">Each client’s retainer against the team time logged on their tasks and the expenses tagged to them. Time is costed at salary ÷ ({HOURS_PER_DAY} hours × working days).</p>
+      <p className="muted">Each client’s revenue for the month (retainer plus any one-time or yearly work billed that month) against the team time logged on their tasks and the expenses tagged to them. A month with a big one-time bill will look very profitable, and the months of work before it less so. Time is costed at salary ÷ ({HOURS_PER_DAY} hours × working days).</p>
     </div>
       <div className="hero-status">
         <Link className="btn secondary small" href={`/profitability?month=${prev}`}>← {monthLabel(prev).split(' ')[0]}</Link>
@@ -36,7 +36,7 @@ export default async function Profitability({ searchParams }: { searchParams: Pr
     {lowCoverage.length > 0 && <div className="card warn-card"><h3>Time logging is low, so costs are understated</h3><p className="muted">{lowCoverage.map((c) => `${c.name} (${Math.round(c.pct!)}%)`).join(', ')} logged under 60% of their working hours so far. Ask the team to run the task timer on every task, or these numbers will look better than they are.</p></div>}
 
     <div className="grid">
-      <div className="card"><div className="label">Client retainers</div><div className="kpi">{rupees(p.totals.revenue)}</div><div className="muted">{p.clients.length} clients</div></div>
+      <div className="card"><div className="label">Client revenue</div><div className="kpi">{rupees(p.totals.revenue)}</div><div className="muted">{p.clients.length} clients</div></div>
       <div className="card"><div className="label">Cost of client work</div><div className="kpi">{rupees(p.totals.clientCosts)}</div><div className="muted">Logged time plus client expenses</div></div>
       <div className="card"><div className="label">Client contribution</div><div className={`kpi ${p.totals.clientProfit < 0 ? 'danger-text' : ''}`}>{rupees(p.totals.clientProfit)}</div><div className="muted">{losing.length} client{losing.length === 1 ? '' : 's'} losing money</div></div>
       <div className="card"><div className="label">Salary not on client work</div><div className="kpi">{rupees(p.totals.unallocated)}</div><div className="muted">of {rupees(p.totals.salaryTotal)} monthly salaries: internal work, gaps or unlogged time</div></div>
@@ -46,7 +46,7 @@ export default async function Profitability({ searchParams }: { searchParams: Pr
       <div className="section-head"><div><h3>By client</h3><p className="muted">Lowest margin first. Margins under 30% are amber, losses are red.</p></div></div>
       {p.clients.length === 0 ? <div className="empty-state">No active clients.</div> :
         <div className="table-wrap"><table className="table">
-          <thead><tr><th>Client</th><th>Retainer</th><th>Hours</th><th>Time cost</th><th>Expenses</th><th>Profit</th><th>Margin</th></tr></thead>
+          <thead><tr><th>Client</th><th>Revenue</th><th>Hours</th><th>Time cost</th><th>Expenses</th><th>Profit</th><th>Margin</th></tr></thead>
           <tbody>{p.clients.map((c) => <tr key={c.id}>
             <td><Link className="client-link" href={`/clients/${c.id}`}><b>{c.name}</b></Link>{c.people.length > 0 && <div className="muted">{c.people.slice(0, 3).map((x) => `${x.name} ${hrs(x.hours)}h`).join(' · ')}</div>}</td>
             <td>{rupees(c.revenue)}</td>
@@ -54,7 +54,7 @@ export default async function Profitability({ searchParams }: { searchParams: Pr
             <td>{rupees(c.labour)}</td>
             <td>{rupees(c.expenses)}</td>
             <td className={c.profit < 0 ? 'danger-text' : ''}><b>{rupees(c.profit)}</b></td>
-            <td>{c.margin === null ? <span className="muted">No retainer</span> : <span className={`pill ${c.margin < 0 ? 'red' : c.margin < 30 ? 'amber' : 'green'}`}>{Math.round(c.margin)}%</span>}</td>
+            <td>{c.margin === null ? <span className="muted">No revenue this month</span> : <span className={`pill ${c.margin < 0 ? 'red' : c.margin < 30 ? 'amber' : 'green'}`}>{Math.round(c.margin)}%</span>}</td>
           </tr>)}</tbody>
         </table></div>}
       {p.internal.some((r) => r.hours > 0) && <p className="muted" style={{ marginTop: 10 }}>Internal work: {p.internal.filter((r) => r.hours > 0).map((r) => `${r.name} ${hrs(r.hours)}h (${rupees(r.labour)})`).join(' · ')}.</p>}
